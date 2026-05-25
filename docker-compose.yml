@@ -1,0 +1,17 @@
+version: '3.9'
+
+services:
+  auction-item-db:
+    image: postgres:18
+    container_name: auction-item-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: auction-item_user
+      POSTGRES_PASSWORD: auction-item_pass
+      POSTGRES_DB: auction-item_db
+    ports:
+      - '5434:5432'
+    volumes:
+      - auction-item_pgdata:/var/lib/postgresql
+volumes:
+  auction-item_pgdata: {}
