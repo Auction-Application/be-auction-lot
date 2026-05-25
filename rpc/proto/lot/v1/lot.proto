@@ -1,0 +1,11 @@
+edition="2023";
+
+package  lot.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = ".;lotPb";
+
+message Lot{
+     string LotName=1 [(buf.validate.field).string.min_len = 1,(buf.validate.field).required = true];
+}
