@@ -7,5 +7,19 @@ import "buf/validate/validate.proto";
 option go_package = ".;lotPb";
 
 message Lot{
-     string LotName=1 [(buf.validate.field).string.min_len = 1,(buf.validate.field).required = true];
+     string lot_title=1 [(buf.validate.field).string.min_len = 1,(buf.validate.field).required = true];
+     string description=2 [(buf.validate.field).string.min_len = 1,(buf.validate.field).required = true];
+}
+
+service LotService{
+    rpc CreateLot(CreateLotRequest) returns(CreateLotResponse);
+}
+
+message CreateLotRequest{
+    Lot lot=1;
+}
+
+message CreateLotResponse{
+    bool success=1;
+    string message=2;
 }
