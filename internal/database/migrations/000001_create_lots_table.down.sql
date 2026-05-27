@@ -1,1 +1,1 @@
-create table if not exists lots(id  uuid primary key default gen_random_uuid(), title varchar(260) not null, description varchar(450) not null);
+drop table if exists lots;

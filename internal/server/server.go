@@ -1,13 +1,16 @@
 package server
 
 import (
+	"context"
 	"fmt"
-	"net"
 
+	"buf.build/go/protovalidate"
 	"github.com/Auction-Application/be-auction-item/internal/database"
+	"github.com/Auction-Application/be-auction-item/internal/database/auctionLotTableQuery"
 	lotPb "github.com/Auction-Application/be-auction-item/rpc/gen/lot/v1"
 	"github.com/jackc/pgx/v5"
-	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type LotServer struct {
@@ -15,32 +18,24 @@ type LotServer struct {
 	database *pgx.Conn
 }
 
+func (s *LotServer) CreateLot(ctx context.Context, req *lotPb.CreateLotRequest) (*lotPb.CreateLotResponse, error) {
+	if err := protovalidate.Validate(req); err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid lot payload")
+	}
+
+	lotTable := auctionLotTableQuery.New(s.database)
+	err := lotTable.CreateLot(ctx, auctionLotTableQuery.CreateLotParams{Title: *req.Lot.LotTitle, Description: *req.Lot.Description})
+	if err != nil {
+		fmt.Println(err)
+		return nil, status.Error(codes.Internal, "error creating lot")
+	}
+
+	return &lotPb.CreateLotResponse{Success: new(true), Message: new("Lot Created")}, nil
+
+}
+
 func NewLotServer() *LotServer {
 	return &LotServer{
 		database: database.ConnectToDB(),
 	}
-}
-
-func Run(port int) error {
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
-
-	if err != nil {
-		fmt.Println("failed to start the server")
-		return err
-	}
-
-	defer listener.Close()
-
-	lotServer := NewLotServer()
-
-	grpcServer := grpc.NewServer()
-	lotPb.RegisterLotServiceServer(grpcServer, lotServer)
-
-	if err := grpcServer.Serve(listener); err != nil {
-		fmt.Println("error in listening the server")
-		return err
-	}
-
-	return nil
-
 }
