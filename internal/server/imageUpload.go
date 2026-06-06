@@ -37,6 +37,7 @@ func (s3Storage S3Storage) UploadFile(ctx context.Context, bucketName string, ob
 	file, err := os.Open(fileName)
 	if err != nil {
 		log.Printf("Couldn't open file %v to upload. Here's why: %v\n", fileName, err)
+		return err
 	} else {
 		_, err := s3Storage.s3Client.PutObject(ctx, &s3.PutObjectInput{
 			Bucket:      aws.String(bucketName),
@@ -55,6 +56,7 @@ func (s3Storage S3Storage) UploadFile(ctx context.Context, bucketName string, ob
 				log.Printf("Couldn't upload file %v to %v:%v. Here's why: %v\n",
 					fileName, bucketName, objectKey, err)
 			}
+			return err
 		}
 
 	}
