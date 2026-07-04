@@ -10,15 +10,22 @@ import (
 )
 
 const createLot = `-- name: CreateLot :exec
-insert into lots(title,description) values($1,$2)
+insert into lots(title,description,category,bid_opening_price) values($1,$2,$3,$4)
 `
 
 type CreateLotParams struct {
-	Title       string
-	Description string
+	Title           string
+	Description     string
+	Category        *string
+	BidOpeningPrice *int32
 }
 
 func (q *Queries) CreateLot(ctx context.Context, arg CreateLotParams) error {
-	_, err := q.db.Exec(ctx, createLot, arg.Title, arg.Description)
+	_, err := q.db.Exec(ctx, createLot,
+		arg.Title,
+		arg.Description,
+		arg.Category,
+		arg.BidOpeningPrice,
+	)
 	return err
 }

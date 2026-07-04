@@ -24,7 +24,7 @@ func (s *LotServer) CreateLot(ctx context.Context, req *lotPb.CreateLotRequest) 
 	}
 
 	lotTable := auctionLotTableQuery.New(s.database)
-	err := lotTable.CreateLot(ctx, auctionLotTableQuery.CreateLotParams{Title: *req.Lot.LotTitle, Description: *req.Lot.Description})
+	err := lotTable.CreateLot(ctx, auctionLotTableQuery.CreateLotParams{Title: *req.Lot.LotTitle, Description: *req.Lot.Description, Category: req.Lot.Category, BidOpeningPrice: req.Lot.BidOpeningPrice})
 	if err != nil {
 		fmt.Println(err)
 		return nil, status.Error(codes.Internal, "error creating lot")

@@ -9,7 +9,9 @@ import (
 )
 
 type Lot struct {
-	ID          uuid.UUID
-	Title       string
-	Description string
+	ID              uuid.UUID
+	Title           string
+	Description     string
+	Category        *string
+	BidOpeningPrice *int32
 }

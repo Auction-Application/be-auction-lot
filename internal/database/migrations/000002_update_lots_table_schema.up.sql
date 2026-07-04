@@ -1,0 +1,1 @@
+alter table lots add column category varchar(260), add column bid_opening_price integer;
