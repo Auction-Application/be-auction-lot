@@ -24,4 +24,5 @@ message CreateLotRequest{
 message CreateLotResponse{
     bool success=1;
     string message=2;
+    string lot_id=3;
 }

@@ -138,6 +138,7 @@ type CreateLotResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       *bool                  `protobuf:"varint,1,opt,name=success" json:"success,omitempty"`
 	Message       *string                `protobuf:"bytes,2,opt,name=message" json:"message,omitempty"`
+	LotId         *string                `protobuf:"bytes,3,opt,name=lot_id,json=lotId" json:"lot_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -186,6 +187,13 @@ func (x *CreateLotResponse) GetMessage() string {
 	return ""
 }
 
+func (x *CreateLotResponse) GetLotId() string {
+	if x != nil && x.LotId != nil {
+		return *x.LotId
+	}
+	return ""
+}
+
 var File_lot_v1_lot_proto protoreflect.FileDescriptor
 
 const file_lot_v1_lot_proto_rawDesc = "" +
@@ -200,10 +208,11 @@ const file_lot_v1_lot_proto_rawDesc = "" +
 	"\xbaH\a\xc8\x01\x01r\x02\x10\x01R\bcategory\x12*\n" +
 	"\x11bid_opening_price\x18\x04 \x01(\x05R\x0fbidOpeningPrice\"1\n" +
 	"\x10CreateLotRequest\x12\x1d\n" +
-	"\x03lot\x18\x01 \x01(\v2\v.lot.v1.LotR\x03lot\"G\n" +
+	"\x03lot\x18\x01 \x01(\v2\v.lot.v1.LotR\x03lot\"^\n" +
 	"\x11CreateLotResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
-	"\amessage\x18\x02 \x01(\tR\amessage2N\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x15\n" +
+	"\x06lot_id\x18\x03 \x01(\tR\x05lotId2N\n" +
 	"\n" +
 	"LotService\x12@\n" +
 	"\tCreateLot\x12\x18.lot.v1.CreateLotRequest\x1a\x19.lot.v1.CreateLotResponseBX\n" +
