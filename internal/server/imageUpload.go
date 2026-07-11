@@ -15,6 +15,12 @@ import (
 	"github.com/aws/smithy-go"
 )
 
+const (
+	multipartThreshold = 150 * 1024 * 1024 // 20MB
+	partSize           = 10 * 1024 * 1024  // 10MB
+	presignExpiry      = 15 * time.Minute
+)
+
 type S3Storage struct {
 	s3Client  *s3.Client
 	Presigner *s3.PresignClient
@@ -64,17 +70,116 @@ func (s3Storage S3Storage) UploadFile(ctx context.Context, bucketName string, ob
 	return nil
 }
 
-func (s3Storage S3Storage) CreatePresignedPutObjectUrl(
-	ctx context.Context, bucketName string, objectKey string, lifetimeSecs int64) (*v4.PresignedHTTPRequest, error) {
-	request, err := s3Storage.Presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+type FilesToUpload struct {
+	Sha256       string
+	FileName     string
+	ClientFileId string
+	FileSize     uint
+}
+
+type PresignedUpload struct {
+	Single *v4.PresignedHTTPRequest
+	Multi  []*v4.PresignedHTTPRequest
+}
+
+type PresignedFileUrl struct {
+	FilesToUpload
+	PresignedUpload
+}
+
+func (s3Storage S3Storage) generateS3UploadUrl(ctx context.Context, files []FilesToUpload, bucketName string) []PresignedFileUrl {
+	var fileUploads []PresignedFileUrl
+
+	for _, file := range files {
+		if file.FileSize < multipartThreshold {
+			notMultipartFileUpload, err := s3Storage.GenerateSinglePresignedPutObjectUrl(ctx, bucketName, file.Sha256)
+			if err != nil {
+				fmt.Println("Error")
+				fmt.Println(err)
+			}
+			fileUploads = append(fileUploads, PresignedFileUrl{FilesToUpload: file, PresignedUpload: PresignedUpload{Single: notMultipartFileUpload}})
+		} else {
+			multipartFileUpload, err := s3Storage.GenerateMultiPartPresignedUrl(ctx, bucketName, file.Sha256, file)
+			if err != nil {
+				fmt.Println("Error")
+				fmt.Println(err)
+			}
+			fileUploads = append(fileUploads, PresignedFileUrl{FilesToUpload: file, PresignedUpload: PresignedUpload{Multi: multipartFileUpload}})
+			// multipartFileUploads=append(fileUploads, multipartFileUpload)
+		}
+
+	}
+	return fileUploads
+}
+
+func (s3Storage S3Storage) GenerateSinglePresignedPutObjectUrl(
+	ctx context.Context, bucketName string, objectKey string) (*v4.PresignedHTTPRequest, error) {
+	presignResult, err := s3Storage.Presigner.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(objectKey),
-	}, func(opts *s3.PresignOptions) {
-		opts.Expires = time.Duration(lifetimeSecs * int64(time.Second))
-	})
+	}, s3.WithPresignExpires(presignExpiry))
 	if err != nil {
 		log.Printf("Couldn't get a presigned request to put %v:%v. Here's why: %v\n",
 			bucketName, objectKey, err)
 	}
-	return request, err
+	return presignResult, err
+}
+
+func (s3Storage S3Storage) GenerateMultiPartPresignedUrl(ctx context.Context, bucketName string, objectKey string, file FilesToUpload) ([]*v4.PresignedHTTPRequest, error) {
+	multiPartCreated, err := s3Storage.s3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{Bucket: &bucketName, Key: &objectKey})
+
+	if err != nil {
+		fmt.Println(err)
+		return nil, fmt.Errorf("Create multipart upload error:%w", err)
+	}
+
+	numParts := (file.FileSize + partSize - 1) / partSize
+	partUrls := make([]*v4.PresignedHTTPRequest, numParts)
+
+	for i := uint(0); i < numParts; i++ {
+		partNumber := int32(i + 1)
+
+		presignedUploadPartUrls, err := s3Storage.Presigner.PresignUploadPart(ctx, &s3.UploadPartInput{Bucket: &bucketName, Key: &objectKey, PartNumber: &partNumber, UploadId: multiPartCreated.UploadId}, s3.WithPresignExpires(presignExpiry))
+
+		if err != nil {
+			fmt.Println(err)
+			return nil, fmt.Errorf("Creating mulipart upload url failed: %w", err)
+		}
+
+		partUrls = append(partUrls, presignedUploadPartUrls)
+
+	}
+
+	return partUrls, nil
+
+}
+
+type DuplicateCheckFilesToUpload struct {
+	FilesToUpload
+	duplicate bool
+}
+
+type DuplicateFiles FilesToUpload
+
+func IntentBatchUpload(fileToUpload []FilesToUpload) ([]FilesToUpload, []DuplicateFiles) {
+
+	// duplicateChecked := make([]DuplicateCheckFilesToUpload, 0, len(fileToUpload))
+	isSeenFileMap := make(map[string]bool, len(fileToUpload))
+	var duplicateFiles []DuplicateFiles
+	var files []FilesToUpload
+
+	for _, v := range fileToUpload {
+
+		if isSeenFileMap[v.Sha256] {
+			duplicateFiles = append(duplicateFiles, DuplicateFiles(v))
+		} else {
+			files = append(files, v)
+		}
+		// duplicateChecked = append(duplicateChecked, DuplicateCheckFilesToUpload{duplicate: isSeenFileMap[v.Sha256], FilesToUpload: v})
+
+		isSeenFileMap[v.Sha256] = true
+	}
+
+	return files, duplicateFiles
+
 }
