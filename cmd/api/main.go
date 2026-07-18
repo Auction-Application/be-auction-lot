@@ -10,7 +10,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-var files = []server.FilesToUpload{
+var files = []server.UploadFile{
 	{
 		Sha256:       "abc123",
 		FileName:     "photo1.jpg",

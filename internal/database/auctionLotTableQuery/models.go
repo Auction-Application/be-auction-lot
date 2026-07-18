@@ -8,10 +8,25 @@ import (
 	"github.com/google/uuid"
 )
 
+type ImageBlob struct {
+	ImageBlobID       int64
+	Sha256            []byte
+	ContentType       string
+	S3Key             string
+	IsUploadCompleted bool
+}
+
 type Lot struct {
 	ID              uuid.UUID
 	Title           string
 	Description     string
 	Category        *string
 	BidOpeningPrice *int32
+}
+
+type LotImage struct {
+	LotImageID  int64
+	LotID       uuid.UUID
+	ImageBlobID int64
+	Filename    string
 }
