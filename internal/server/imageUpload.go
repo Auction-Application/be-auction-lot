@@ -110,7 +110,6 @@ func (s3Storage S3Storage) generateS3UploadUrl(ctx context.Context, files []Uplo
 				return nil, err
 			}
 			fileUploads = append(fileUploads, PresignedFileUrl{UploadFile: file, PresignedUploadUrl: PresignedUploadUrl{Multi: multipartFileUpload}})
-			// multipartFileUploads=append(fileUploads, multipartFileUpload)
 		}
 
 	}
@@ -168,7 +167,6 @@ type DuplicateFile UploadFile
 
 func IntentBatchUpload(fileToUpload []UploadFile) ([]UploadFile, []DuplicateFile) {
 
-	// duplicateChecked := make([]DuplicateCheckFilesToUpload, 0, len(fileToUpload))
 	isSeenFileMap := make(map[string]bool, len(fileToUpload))
 	var duplicateFiles []DuplicateFile
 	var files []UploadFile
@@ -180,7 +178,6 @@ func IntentBatchUpload(fileToUpload []UploadFile) ([]UploadFile, []DuplicateFile
 		} else {
 			files = append(files, v)
 		}
-		// duplicateChecked = append(duplicateChecked, DuplicateCheckFilesToUpload{duplicate: isSeenFileMap[v.Sha256], FilesToUpload: v})
 
 		isSeenFileMap[v.Sha256] = true
 	}
@@ -238,28 +235,6 @@ func skipUploadForIdenticalImageBlobs(files []UploadFile, lotId string, query *a
 			needToBeUploadedFiles = append(needToBeUploadedFiles, f)
 		}
 	}
-
-	// identicalBlobs,err:=query.CheckIdenticalBlobs(context.TODO())
-	// if err!=nil{
-	// 	fmt.Println("Error in finding identical blobs")
-	// 	fmt.Printf("%w",err);
-	// 	return;
-	// }
-	// uploadFilesMap:=make(map[string]UploadFile,len(files))
-
-	// for _,file:=range files{
-	// 	uploadFilesMap[file.Sha256]=file
-	// }
-
-	// for _,blobImage:= range identicalBlobs{
-	// 	shaString:=hex.EncodeToString(blobImage.Sha256)
-	// 	if f,ok:=uploadFilesMap[shaString];ok{
-	// 		alreadyUploadedFiles=append(alreadyUploadedFiles,AlreadyUploadedFile(f) )
-	// 	}else{
-	// 		needToBeUploadedFiles=append(needToBeUploadedFiles, f)
-	// 	}
-
-	// }
 
 	return needToBeUploadedFiles, alreadyUploadedFiles, nil
 

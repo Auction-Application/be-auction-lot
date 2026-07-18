@@ -15,7 +15,6 @@ import (
 type LotServer struct {
 	lotPb.UnimplementedLotServiceServer
 	dbStorageQuery *auctionLotTableQuery.Queries
-	// database *pgx.Conn
 }
 
 func (s *LotServer) CreateLot(ctx context.Context, req *lotPb.CreateLotRequest) (*lotPb.CreateLotResponse, error) {
@@ -23,7 +22,6 @@ func (s *LotServer) CreateLot(ctx context.Context, req *lotPb.CreateLotRequest) 
 		return nil, status.Error(codes.InvalidArgument, "invalid lot payload")
 	}
 
-	// lotTable := auctionLotTableQuery.New(s.database)
 	id, err := s.dbStorageQuery.CreateLot(ctx, auctionLotTableQuery.CreateLotParams{Title: *req.Lot.LotTitle, Description: *req.Lot.Description, Category: req.Lot.Category, BidOpeningPrice: req.Lot.BidOpeningPrice})
 	if err != nil {
 		fmt.Println(err)
@@ -36,7 +34,6 @@ func (s *LotServer) CreateLot(ctx context.Context, req *lotPb.CreateLotRequest) 
 
 func NewLotServer() *LotServer {
 	return &LotServer{
-		// database: database.ConnectToDB(),
 		dbStorageQuery: auctionLotTableQuery.New(database.ConnectToDB()),
 	}
 }
