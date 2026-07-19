@@ -1,28 +1,37 @@
-edition="2023";
+edition = "2023";
 
-package  lot.v1;
+package lot.v1;
 
 import "buf/validate/validate.proto";
 
 option go_package = ".;lotPb";
 
-message Lot{
-     string lot_title=1 [(buf.validate.field).string.min_len = 1,(buf.validate.field).required = true];
-     string description=2 [(buf.validate.field).string.min_len = 1,(buf.validate.field).required = true];
-     string category=3 [(buf.validate.field).string.min_len = 1,(buf.validate.field).required = true];
-     int32 bid_opening_price=4;
+message Lot {
+  string lot_title = 1 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).required = true
+  ];
+  string description = 2 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).required = true
+  ];
+  string category = 3 [
+    (buf.validate.field).string.min_len = 1,
+    (buf.validate.field).required = true
+  ];
+  int32 bid_opening_price = 4;
 }
 
-service LotService{
-    rpc CreateLot(CreateLotRequest) returns(CreateLotResponse);
+service LotService {
+  rpc CreateLot(CreateLotRequest) returns (CreateLotResponse);
 }
 
-message CreateLotRequest{
-    Lot lot=1;
+message CreateLotResponse {
+  bool success = 1;
+  string message = 2;
+  string lot_id = 3;
 }
 
-message CreateLotResponse{
-    bool success=1;
-    string message=2;
-    string lot_id=3;
+message CreateLotRequest {
+  Lot lot = 1;
 }

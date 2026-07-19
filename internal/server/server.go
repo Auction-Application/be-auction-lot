@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	"buf.build/go/protovalidate"
-	"github.com/Auction-Application/be-auction-item/internal/database"
 	"github.com/Auction-Application/be-auction-item/internal/database/auctionLotTableQuery"
 	lotPb "github.com/Auction-Application/be-auction-item/rpc/gen/lot/v1"
+	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -32,8 +32,8 @@ func (s *LotServer) CreateLot(ctx context.Context, req *lotPb.CreateLotRequest) 
 
 }
 
-func NewLotServer() *LotServer {
+func NewLotServer(databaseConnection *pgx.Conn) *LotServer {
 	return &LotServer{
-		dbStorageQuery: auctionLotTableQuery.New(database.ConnectToDB()),
+		dbStorageQuery: auctionLotTableQuery.New(databaseConnection),
 	}
 }

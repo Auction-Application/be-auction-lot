@@ -1,4 +1,4 @@
-package server
+package imagestore
 
 import (
 	"context"
@@ -163,7 +163,7 @@ type DuplicateCheckFilesToUpload struct {
 	duplicate bool
 }
 
-type DuplicateFile UploadFile
+type DuplicateFile= UploadFile
 
 func IntentBatchUpload(fileToUpload []UploadFile) ([]UploadFile, []DuplicateFile) {
 
@@ -174,7 +174,7 @@ func IntentBatchUpload(fileToUpload []UploadFile) ([]UploadFile, []DuplicateFile
 	for _, v := range fileToUpload {
 
 		if isSeenFileMap[v.Sha256] {
-			duplicateFiles = append(duplicateFiles, DuplicateFile(v))
+			duplicateFiles = append(duplicateFiles, v)
 		} else {
 			files = append(files, v)
 		}
@@ -186,15 +186,15 @@ func IntentBatchUpload(fileToUpload []UploadFile) ([]UploadFile, []DuplicateFile
 
 }
 
-func initiateUpload(s3Storage S3Storage, fileToUpload []UploadFile, bucketName string, lotId string, lotServer LotServer) ([]DuplicateFile, []AlreadyUploadedFile, []PresignedFileUrl, error) {
+func (imageStore *ImageStore)initiateUpload( fileToUpload []UploadFile, bucketName string, lotId string) ([]DuplicateFile, []AlreadyUploadedFile, []PresignedFileUrl, error) {
 	files, duplicateFiles := IntentBatchUpload(fileToUpload)
 	fmt.Println(duplicateFiles)
-	needToBeUploadFiles, alreadyUploadedFiles, err := skipUploadForIdenticalImageBlobs(files, lotId, lotServer.dbStorageQuery)
+	needToBeUploadFiles, alreadyUploadedFiles, err := skipUploadForIdenticalImageBlobs(files, lotId, imageStore.dbStorageQuery)
 	if err != nil {
 		fmt.Println(err)
 		return nil, nil, nil, err
 	}
-	presignedUrls, err := s3Storage.generateS3UploadUrl(context.TODO(), needToBeUploadFiles, bucketName)
+	presignedUrls, err := imageStore.s3Storage.generateS3UploadUrl(context.TODO(), needToBeUploadFiles, bucketName)
 	if err != nil {
 		fmt.Println(err)
 		return nil, nil, nil, err
@@ -203,7 +203,7 @@ func initiateUpload(s3Storage S3Storage, fileToUpload []UploadFile, bucketName s
 
 }
 
-type AlreadyUploadedFile UploadFile
+type AlreadyUploadedFile= UploadFile
 
 func skipUploadForIdenticalImageBlobs(files []UploadFile, lotId string, query *auctionLotTableQuery.Queries) ([]UploadFile, []AlreadyUploadedFile, error) {
 	var alreadyUploadedFiles []AlreadyUploadedFile
@@ -230,7 +230,7 @@ func skipUploadForIdenticalImageBlobs(files []UploadFile, lotId string, query *a
 
 	for _, identicalFileBlob := range identicalBlobs {
 		if f, ok := fileMap[identicalFileBlob.Sha256]; ok {
-			alreadyUploadedFiles = append(alreadyUploadedFiles, AlreadyUploadedFile(f))
+			alreadyUploadedFiles = append(alreadyUploadedFiles, f)
 		} else {
 			needToBeUploadedFiles = append(needToBeUploadedFiles, f)
 		}

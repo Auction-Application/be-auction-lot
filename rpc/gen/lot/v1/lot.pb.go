@@ -90,50 +90,6 @@ func (x *Lot) GetBidOpeningPrice() int32 {
 	return 0
 }
 
-type CreateLotRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Lot           *Lot                   `protobuf:"bytes,1,opt,name=lot" json:"lot,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *CreateLotRequest) Reset() {
-	*x = CreateLotRequest{}
-	mi := &file_lot_v1_lot_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *CreateLotRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*CreateLotRequest) ProtoMessage() {}
-
-func (x *CreateLotRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_lot_v1_lot_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use CreateLotRequest.ProtoReflect.Descriptor instead.
-func (*CreateLotRequest) Descriptor() ([]byte, []int) {
-	return file_lot_v1_lot_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *CreateLotRequest) GetLot() *Lot {
-	if x != nil {
-		return x.Lot
-	}
-	return nil
-}
-
 type CreateLotResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       *bool                  `protobuf:"varint,1,opt,name=success" json:"success,omitempty"`
@@ -145,7 +101,7 @@ type CreateLotResponse struct {
 
 func (x *CreateLotResponse) Reset() {
 	*x = CreateLotResponse{}
-	mi := &file_lot_v1_lot_proto_msgTypes[2]
+	mi := &file_lot_v1_lot_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -157,7 +113,7 @@ func (x *CreateLotResponse) String() string {
 func (*CreateLotResponse) ProtoMessage() {}
 
 func (x *CreateLotResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_lot_v1_lot_proto_msgTypes[2]
+	mi := &file_lot_v1_lot_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -170,7 +126,7 @@ func (x *CreateLotResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateLotResponse.ProtoReflect.Descriptor instead.
 func (*CreateLotResponse) Descriptor() ([]byte, []int) {
-	return file_lot_v1_lot_proto_rawDescGZIP(), []int{2}
+	return file_lot_v1_lot_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *CreateLotResponse) GetSuccess() bool {
@@ -194,6 +150,50 @@ func (x *CreateLotResponse) GetLotId() string {
 	return ""
 }
 
+type CreateLotRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Lot           *Lot                   `protobuf:"bytes,1,opt,name=lot" json:"lot,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateLotRequest) Reset() {
+	*x = CreateLotRequest{}
+	mi := &file_lot_v1_lot_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateLotRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateLotRequest) ProtoMessage() {}
+
+func (x *CreateLotRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_lot_v1_lot_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateLotRequest.ProtoReflect.Descriptor instead.
+func (*CreateLotRequest) Descriptor() ([]byte, []int) {
+	return file_lot_v1_lot_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CreateLotRequest) GetLot() *Lot {
+	if x != nil {
+		return x.Lot
+	}
+	return nil
+}
+
 var File_lot_v1_lot_proto protoreflect.FileDescriptor
 
 const file_lot_v1_lot_proto_rawDesc = "" +
@@ -206,13 +206,13 @@ const file_lot_v1_lot_proto_rawDesc = "" +
 	"\xbaH\a\xc8\x01\x01r\x02\x10\x01R\vdescription\x12&\n" +
 	"\bcategory\x18\x03 \x01(\tB\n" +
 	"\xbaH\a\xc8\x01\x01r\x02\x10\x01R\bcategory\x12*\n" +
-	"\x11bid_opening_price\x18\x04 \x01(\x05R\x0fbidOpeningPrice\"1\n" +
-	"\x10CreateLotRequest\x12\x1d\n" +
-	"\x03lot\x18\x01 \x01(\v2\v.lot.v1.LotR\x03lot\"^\n" +
+	"\x11bid_opening_price\x18\x04 \x01(\x05R\x0fbidOpeningPrice\"^\n" +
 	"\x11CreateLotResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\x12\x15\n" +
-	"\x06lot_id\x18\x03 \x01(\tR\x05lotId2N\n" +
+	"\x06lot_id\x18\x03 \x01(\tR\x05lotId\"1\n" +
+	"\x10CreateLotRequest\x12\x1d\n" +
+	"\x03lot\x18\x01 \x01(\v2\v.lot.v1.LotR\x03lot2N\n" +
 	"\n" +
 	"LotService\x12@\n" +
 	"\tCreateLot\x12\x18.lot.v1.CreateLotRequest\x1a\x19.lot.v1.CreateLotResponseBX\n" +
@@ -234,13 +234,13 @@ func file_lot_v1_lot_proto_rawDescGZIP() []byte {
 var file_lot_v1_lot_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_lot_v1_lot_proto_goTypes = []any{
 	(*Lot)(nil),               // 0: lot.v1.Lot
-	(*CreateLotRequest)(nil),  // 1: lot.v1.CreateLotRequest
-	(*CreateLotResponse)(nil), // 2: lot.v1.CreateLotResponse
+	(*CreateLotResponse)(nil), // 1: lot.v1.CreateLotResponse
+	(*CreateLotRequest)(nil),  // 2: lot.v1.CreateLotRequest
 }
 var file_lot_v1_lot_proto_depIdxs = []int32{
 	0, // 0: lot.v1.CreateLotRequest.lot:type_name -> lot.v1.Lot
-	1, // 1: lot.v1.LotService.CreateLot:input_type -> lot.v1.CreateLotRequest
-	2, // 2: lot.v1.LotService.CreateLot:output_type -> lot.v1.CreateLotResponse
+	2, // 1: lot.v1.LotService.CreateLot:input_type -> lot.v1.CreateLotRequest
+	1, // 2: lot.v1.LotService.CreateLot:output_type -> lot.v1.CreateLotResponse
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
