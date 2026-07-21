@@ -1,6 +1,7 @@
 package imagestore
 
 import (
+	"context"
 	"fmt"
 	"strconv"
 
@@ -19,7 +20,7 @@ type ImageStore struct {
 	s3Storage      *S3Storage
 }
 
-func (imageStore *ImageStore) GeneratePresignedUrl(presignRequest *lotimage.GeneratePresignedUrlRequest) (*lotimage.GeneratePresignedUrlResponse, error) {
+func (imageStore *ImageStore) GeneratePresignedUrl(ctx context.Context, presignRequest *lotimage.GeneratePresignedUrlRequest) (*lotimage.GeneratePresignedUrlResponse, error) {
 
 	duplicateFiles, alreadUploadedFiles, presignedUrls, err := imageStore.initiateUpload(convertToUploadFiles(presignRequest.LotImages), "arn:aws:s3:ap-south-1:433154991296:accesspoint/auction-lot-service-access-point", *presignRequest.LotId)
 
