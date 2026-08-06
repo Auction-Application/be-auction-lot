@@ -15,6 +15,7 @@ import (
 type LotServer struct {
 	lotPb.UnimplementedLotServiceServer
 	dbStorageQuery *auctionLotTableQuery.Queries
+	conn           *pgx.Conn
 }
 
 func (s *LotServer) CreateLot(ctx context.Context, req *lotPb.CreateLotRequest) (*lotPb.CreateLotResponse, error) {
@@ -35,5 +36,6 @@ func (s *LotServer) CreateLot(ctx context.Context, req *lotPb.CreateLotRequest) 
 func NewLotServer(databaseConnection *pgx.Conn) *LotServer {
 	return &LotServer{
 		dbStorageQuery: auctionLotTableQuery.New(databaseConnection),
+		conn:           databaseConnection,
 	}
 }

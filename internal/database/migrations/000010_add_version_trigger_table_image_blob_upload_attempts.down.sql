@@ -1,0 +1,1 @@
+drop trigger if exists bump_row_version on image_blob_upload_attempts restrict;

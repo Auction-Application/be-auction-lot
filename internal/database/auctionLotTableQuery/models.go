@@ -5,8 +5,96 @@
 package auctionLotTableQuery
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type UploadAttemptState string
+
+const (
+	UploadAttemptStatePending   UploadAttemptState = "pending"
+	UploadAttemptStateCommitted UploadAttemptState = "committed"
+)
+
+func (e *UploadAttemptState) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UploadAttemptState(s)
+	case string:
+		*e = UploadAttemptState(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UploadAttemptState: %T", src)
+	}
+	return nil
+}
+
+type NullUploadAttemptState struct {
+	UploadAttemptState UploadAttemptState
+	Valid              bool // Valid is true if UploadAttemptState is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUploadAttemptState) Scan(value interface{}) error {
+	if value == nil {
+		ns.UploadAttemptState, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UploadAttemptState.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUploadAttemptState) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UploadAttemptState), nil
+}
+
+type UploadType string
+
+const (
+	UploadTypeMultiUpload  UploadType = "multiUpload"
+	UploadTypeSingleUpload UploadType = "singleUpload"
+)
+
+func (e *UploadType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = UploadType(s)
+	case string:
+		*e = UploadType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for UploadType: %T", src)
+	}
+	return nil
+}
+
+type NullUploadType struct {
+	UploadType UploadType
+	Valid      bool // Valid is true if UploadType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullUploadType) Scan(value interface{}) error {
+	if value == nil {
+		ns.UploadType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.UploadType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullUploadType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.UploadType), nil
+}
 
 type ImageBlob struct {
 	ImageBlobID       int64
@@ -14,6 +102,24 @@ type ImageBlob struct {
 	ContentType       string
 	S3Key             string
 	IsUploadCompleted bool
+}
+
+type ImageBlobUploadAttempt struct {
+	ImageBlobUploadAttemptID int64
+	Sha256                   []byte
+	FileSize                 int64
+	ContentType              string
+	UploadType               UploadType
+	UploadID                 *string
+	PartSize                 *int64
+	PartCount                *int64
+	LotID                    uuid.UUID
+	FileName                 *string
+	StorageKey               string
+	Username                 string
+	UploadState              UploadAttemptState
+	Version                  int32
+	ValidUntil               pgtype.Timestamptz
 }
 
 type Lot struct {
@@ -28,5 +134,5 @@ type LotImage struct {
 	LotImageID  int64
 	LotID       uuid.UUID
 	ImageBlobID int64
-	Filename    string
+	FileName    string
 }

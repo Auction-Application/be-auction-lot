@@ -81,6 +81,7 @@ func main() {
 }
 
 type Rpc struct {
+	// conn       *pgx.Conn
 	lotServer  *server.LotServer
 	imageStore *imagestore.ImageStore
 }
@@ -88,6 +89,7 @@ type Rpc struct {
 func createRpc() Rpc {
 	databaseConnection := database.ConnectToDB()
 	rpc := Rpc{
+		// conn:       databaseConnection,
 		lotServer:  server.NewLotServer(databaseConnection),
 		imageStore: imagestore.NewImageStore(databaseConnection),
 	}

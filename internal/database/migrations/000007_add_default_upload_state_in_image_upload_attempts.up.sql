@@ -1,0 +1,1 @@
+alter table image_blob_upload_attempts alter column upload_state set default 'pending'

@@ -18,6 +18,7 @@ type ImageStore struct {
 	lotimage.UnimplementedLotImageServiceServer
 	dbStorageQuery *auctionLotTableQuery.Queries
 	s3Storage      *S3Storage
+	conn           *pgx.Conn
 }
 
 func (imageStore *ImageStore) GeneratePresignedUrl(ctx context.Context, presignRequest *lotimage.GeneratePresignedUrlRequest) (*lotimage.GeneratePresignedUrlResponse, error) {
@@ -191,5 +192,6 @@ func NewImageStore(databaseConnection *pgx.Conn) *ImageStore {
 	return &ImageStore{
 		dbStorageQuery: auctionLotTableQuery.New(databaseConnection),
 		s3Storage:      s3Storage,
+		conn:           databaseConnection,
 	}
 }
