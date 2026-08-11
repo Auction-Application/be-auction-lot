@@ -9,23 +9,204 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const insertAndValidateMultiPartUpload = `-- name: InsertAndValidateMultiPartUpload :many
+
+
+
+
+
+
+
+
+
+
+
+
+insert into image_blob_upload_attempts(
+  sha256, file_size, content_type, upload_type, 
+  upload_id, part_size, lot_id, file_name, 
+  username, storage_key
+) 
+select 
+  decode(i.sha256, 'hex') sha256, 
+  i.file_size, 
+  i.content_type, 
+  $1 :: upload_type, 
+  i.upload_id, 
+  $2 :: bigint, 
+  $3 :: uuid, 
+  i.file_name, 
+  $4 :: varchar(128), 
+  i.storage_key 
+from 
+  unnest(
+    $5 :: char(64) [], 
+  $6 :: int[], 
+  $7 :: text[], 
+  $8 :: text[], 
+  
+    $9 :: varchar(250) []
+  , 
+  $10 :: uuid[]) i(
+    sha256, file_size, content_type, upload_id, 
+    file_name, storage_key
+  ) on conflict (sha256, lot_id) 
+where 
+  upload_state = 'pending' do 
+update 
+set 
+  part_size = case when image_blob_upload_attempts.valid_until >= transaction_timestamp() then image_blob_upload_attempts.part_size else $2 :: bigint end, 
+  valid_until = case when image_blob_upload_attempts.valid_until >= transaction_timestamp() then image_blob_upload_attempts.valid_until else transaction_timestamp()+ interval '5 days' end 
+returning 
+  part_size, 
+  image_blob_upload_attempt_id, 
+  encode(sha256,'hex') sha256, 
+  storage_key, 
+  upload_id,
+    ARRAY(
+    SELECT
+      generate_series(1, part_count, 1)
+  )::smallint[] AS parts,
+  (old is null):: boolean as is_inserted, 
+coalesce(old.valid_until >=Now(),false)::boolean as is_valid
+`
+
+type InsertAndValidateMultiPartUploadParams struct {
+	UploadType   UploadType
+	PartSize     int64
+	LotID        uuid.UUID
+	Username     string
+	Sha256s      []string
+	FileSizes    []int32
+	ContentTypes []string
+	UploadIds    []string
+	FileNames    []string
+	StorageKeys  []uuid.UUID
+}
+
+type InsertAndValidateMultiPartUploadRow struct {
+	PartSize                 *int64
+	ImageBlobUploadAttemptID int64
+	Sha256                   string
+	StorageKey               uuid.UUID
+	UploadID                 *string
+	Parts                    []int16
+	IsInserted               bool
+	IsValid                  bool
+}
+
+// SELECT
+// image_blob_upload_attempt_id,
+//
+//	encode(sha256, 'hex') AS sha256,
+//	upload_id,
+//	valid_until,
+//	file_size,
+//	part_size,
+//	storage_key,
+//	ARRAY(
+//	  SELECT
+//	    generate_series(1, part_count, 1)
+//	)::smallint[] AS parts
+//
+// FROM
+//
+//	image_blob_upload_attempts
+//
+// WHERE
+//
+//	sha256 = ANY (
+//	  SELECT
+//	    decode(i.sha256, 'hex') AS sha256
+//	  FROM
+//	    unnest(@sha256s::char(64)[]) i(sha256)
+//	)
+//	AND lot_id = @lot_id::uuid
+//	AND upload_type = 'multiUpload'::upload_type
+//	AND upload_state = 'pending'::upload_state
+//
+// FOR UPDATE;
+// update  image_blob_upload_attempts iba
+// set upload_id=input.upload_id,
+//
+//	valid_until=default,
+//	part_size=input.part_size
+//
+// from
+// (
+//
+//	select m.upload_id,m.image_blob_upload_attempt_id,@part_size::bigint from
+//	unnest(@upload_ids::text[]),unnest(@image_blob_upload_attempt_ids::bigint[])
+//
+// m(upload_id,image_blob_upload_attempt_id)
+// ) as input
+//
+//	where iba.image_blob_upload_attempt_id=input.image_blob_upload_attempt_id;
+//
+// insert into image_blob_upload_attempts(sha256,file_size,content_type,upload_type,upload_id,part_size,lot_id,file_name,username,storage_key)
+// select  decode(i.sha256, 'hex') sha256, i.file_size,i.content_type,@upload_type::upload_type,i.upload_id,@part_size::bigint,@lot_id::uuid,i.file_name,
+// @username::varchar(128), i.storage_key from
+// unnest(
+// @sha256s::char(64)[]),unnest(@file_sizes::int[]),unnest(@content_types::text[]),unnest(@upload_ids::text[]),
+// unnest(@file_names::varchar(250)[]), unnest(@storage_keys::uuid[])  i(sha256,file_size,content_type,upload_id,file_name,storage_key)
+// on conflict (sha256,lot_id) where upload_state='pending' do update
+// set storage_key=image_blob_upload_attempts.storage_key returning sha256,storage_key,upload_id,(old is null)::boolean as is_inserted;
+func (q *Queries) InsertAndValidateMultiPartUpload(ctx context.Context, arg InsertAndValidateMultiPartUploadParams) ([]InsertAndValidateMultiPartUploadRow, error) {
+	rows, err := q.db.Query(ctx, insertAndValidateMultiPartUpload,
+		arg.UploadType,
+		arg.PartSize,
+		arg.LotID,
+		arg.Username,
+		arg.Sha256s,
+		arg.FileSizes,
+		arg.ContentTypes,
+		arg.UploadIds,
+		arg.FileNames,
+		arg.StorageKeys,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []InsertAndValidateMultiPartUploadRow
+	for rows.Next() {
+		var i InsertAndValidateMultiPartUploadRow
+		if err := rows.Scan(
+			&i.PartSize,
+			&i.ImageBlobUploadAttemptID,
+			&i.Sha256,
+			&i.StorageKey,
+			&i.UploadID,
+			&i.Parts,
+			&i.IsInserted,
+			&i.IsValid,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const insertIdenticalImageBlobsToLotImages = `-- name: InsertIdenticalImageBlobsToLotImages :many
 WITH file_uploads
      (
           sha256,
-          lot_id,
-          file_name
+          file_name,
+          lot_id
      )
      AS
      (
             SELECT sha256,
                    file_name,
                    $1::uuid
-            FROM   unnest($2::   char(64)[]),
-                   unnest($3::varchar(250)[]) i(sha256,file_name)
+            FROM   unnest($2::char(64)[],$3::varchar(250)[]) i(sha256,file_name)
+                --    unnest(@file_names::varchar(250)[]) i(sha256,file_name)
      )
      ,
      lot_image_inserts AS
@@ -93,75 +274,7 @@ func (q *Queries) InsertIdenticalImageBlobsToLotImages(ctx context.Context, arg 
 	return items, nil
 }
 
-const insertNewMultipartUpload = `-- name: InsertNewMultipartUpload :many
-insert into image_blob_upload_attempts(sha256,file_size,content_type,upload_type,upload_id,part_size,lot_id,file_name,storage_key,username)
-select  decode(i.sha256, 'hex') sha256, i.file_size,i.content_type,$1::upload_type,i.upload_id,i.part_size,$2::uuid,i.file_name,i.storage_key,
-$3::varchar(128) from
-unnest(
-$4::char(64)[]),unnest($5::int[]),unnest($6::text[]),unnest($7::text[]),unnest($8::int[]),
-unnest($9::varchar(250)[]),unnest($10::uuid[]
-)
-on conflict (sha256,lot_id) where upload_state='pending' do update 
-set storage_key=image_blob_upload_attempts.storage_key returning sha256,storage_key,upload_id,(old is null)::boolean as is_inserted
-`
-
-type InsertNewMultipartUploadParams struct {
-	UploadType   UploadType
-	LotID        uuid.UUID
-	Username     string
-	Sha256s      []string
-	FileSizes    []int32
-	ContentTypes []string
-	UploadIds    []string
-	PartSizes    []int32
-	FileNames    []string
-	StorageKeys  []uuid.UUID
-}
-
-type InsertNewMultipartUploadRow struct {
-	Sha256     []byte
-	StorageKey string
-	UploadID   *string
-	IsInserted bool
-}
-
-func (q *Queries) InsertNewMultipartUpload(ctx context.Context, arg InsertNewMultipartUploadParams) ([]InsertNewMultipartUploadRow, error) {
-	rows, err := q.db.Query(ctx, insertNewMultipartUpload,
-		arg.UploadType,
-		arg.LotID,
-		arg.Username,
-		arg.Sha256s,
-		arg.FileSizes,
-		arg.ContentTypes,
-		arg.UploadIds,
-		arg.PartSizes,
-		arg.FileNames,
-		arg.StorageKeys,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []InsertNewMultipartUploadRow
-	for rows.Next() {
-		var i InsertNewMultipartUploadRow
-		if err := rows.Scan(
-			&i.Sha256,
-			&i.StorageKey,
-			&i.UploadID,
-			&i.IsInserted,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const insertSinglePartUpload = `-- name: InsertSinglePartUpload :exec
+const insertSinglePartUpload = `-- name: InsertSinglePartUpload :many
 INSERT INTO image_blob_upload_attempts
             (
                         sha256,
@@ -170,7 +283,6 @@ INSERT INTO image_blob_upload_attempts
                         upload_type,
                         lot_id,
                         file_name,
-                        storage_key,
                         username
             )
 SELECT Decode(i.sha256,'hex'),
@@ -179,11 +291,11 @@ SELECT Decode(i.sha256,'hex'),
        $1::upload_type,
        $2::     uuid,
        i.file_name,
-       i.storage_key,
        $3::text
-FROM   unnest( $4::char(64)[]), unnest($5::int[]), unnest($6:: text[]), unnest($7::text[]), unnest($8::uuid[] ) i(sha256,file_size,content_type,file_name,storage_key)
+FROM   unnest( $4::char(64)[],$5::int[],$6:: text[],$7::text[]) i(sha256,file_size,content_type,file_name)
 ON conflict (sha256,lot_id)
-WHERE  upload_state='pending' do nothing
+WHERE  upload_state='pending'
+do update  set storage_key=image_blob_upload_attempts.storage_key returning encode(sha256, 'hex') sha256,storage_key,(old is null)::boolean as is_inserted
 `
 
 type InsertSinglePartUploadParams struct {
@@ -194,11 +306,16 @@ type InsertSinglePartUploadParams struct {
 	FileSizes    []int32
 	ContentTypes []string
 	FilesNames   []string
-	StorageKeys  []uuid.UUID
 }
 
-func (q *Queries) InsertSinglePartUpload(ctx context.Context, arg InsertSinglePartUploadParams) error {
-	_, err := q.db.Exec(ctx, insertSinglePartUpload,
+type InsertSinglePartUploadRow struct {
+	Sha256     string
+	StorageKey uuid.UUID
+	IsInserted bool
+}
+
+func (q *Queries) InsertSinglePartUpload(ctx context.Context, arg InsertSinglePartUploadParams) ([]InsertSinglePartUploadRow, error) {
+	rows, err := q.db.Query(ctx, insertSinglePartUpload,
 		arg.UploadType,
 		arg.LotID,
 		arg.Username,
@@ -206,71 +323,15 @@ func (q *Queries) InsertSinglePartUpload(ctx context.Context, arg InsertSinglePa
 		arg.FileSizes,
 		arg.ContentTypes,
 		arg.FilesNames,
-		arg.StorageKeys,
 	)
-	return err
-}
-
-const listMultiUploadItems = `-- name: ListMultiUploadItems :many
-SELECT
-image_blob_upload_attempt_id,
-  encode(sha256, 'hex') AS sha256,
-  upload_id,
-  valid_until,
-  file_size,
-  part_size,
-  ARRAY(
-    SELECT
-      generate_series(1, part_count, 1)
-  )::smallint[] AS parts
-FROM
-  image_blob_upload_attempts
-WHERE
-  sha256 = ANY (
-    SELECT
-      decode(i.sha256, 'hex') AS sha256
-    FROM
-      unnest($1::char(64)[]) i(sha256)
-  )
-  AND lot_id = $2::uuid
-  AND upload_type = 'multiUpload'::upload_type
-  AND upload_state = 'pending'::upload_state
-FOR UPDATE
-`
-
-type ListMultiUploadItemsParams struct {
-	Sha256s []string
-	LotID   uuid.UUID
-}
-
-type ListMultiUploadItemsRow struct {
-	ImageBlobUploadAttemptID int64
-	Sha256                   string
-	UploadID                 *string
-	ValidUntil               pgtype.Timestamptz
-	FileSize                 int64
-	PartSize                 *int64
-	Parts                    []int16
-}
-
-func (q *Queries) ListMultiUploadItems(ctx context.Context, arg ListMultiUploadItemsParams) ([]ListMultiUploadItemsRow, error) {
-	rows, err := q.db.Query(ctx, listMultiUploadItems, arg.Sha256s, arg.LotID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListMultiUploadItemsRow
+	var items []InsertSinglePartUploadRow
 	for rows.Next() {
-		var i ListMultiUploadItemsRow
-		if err := rows.Scan(
-			&i.ImageBlobUploadAttemptID,
-			&i.Sha256,
-			&i.UploadID,
-			&i.ValidUntil,
-			&i.FileSize,
-			&i.PartSize,
-			&i.Parts,
-		); err != nil {
+		var i InsertSinglePartUploadRow
+		if err := rows.Scan(&i.Sha256, &i.StorageKey, &i.IsInserted); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -279,39 +340,4 @@ func (q *Queries) ListMultiUploadItems(ctx context.Context, arg ListMultiUploadI
 		return nil, err
 	}
 	return items, nil
-}
-
-const validateMultipartUpload = `-- name: ValidateMultipartUpload :exec
-
-update  image_blob_upload_attempts iba
-set upload_id=input.upload_id,
- valid_until=default,
- part_size=input.part_size
-from
-(
-	select m.upload_id,m.image_blob_upload_attempt_id,$1::bigint from 
-	unnest($2::text[]),unnest($3::bigint[]) 
-m(upload_id,image_blob_upload_attempt_id)
-) as input
-
- where iba.image_blob_upload_attempt_id=input.image_blob_upload_attempt_id
-`
-
-type ValidateMultipartUploadParams struct {
-	PartSize                  int64
-	UploadIds                 []string
-	ImageBlobUploadAttemptIds []int64
-}
-
-// update  image_blob_upload_attempts iba
-// set upload_id=m.upload_id,
-//
-//	valid_until=default,
-//	part_size=m.part_size
-//
-// from unnest(@upload_ids::text[]),unnest(@image_blob_upload_attempt_ids::bigint[]),unnest(@part_sizes::bigint[])
-// m(upload_id,image_blob_upload_attempt_id,part_size) where iba.image_blob_upload_attempt_id=m.image_blob_upload_attempt_id;
-func (q *Queries) ValidateMultipartUpload(ctx context.Context, arg ValidateMultipartUploadParams) error {
-	_, err := q.db.Exec(ctx, validateMultipartUpload, arg.PartSize, arg.UploadIds, arg.ImageBlobUploadAttemptIds)
-	return err
 }

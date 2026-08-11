@@ -3,6 +3,8 @@ sql:
   - engine: 'postgresql'
     queries: './db_queries'
     schema: './migrations'
+    database:
+      uri: 'postgres://auction-lot_user:auction-lot_pass@localhost:5434/auction-lot_db?sslmode=disable'
     gen:
       go:
         package: 'auctionLotTableQuery'

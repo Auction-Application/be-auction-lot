@@ -115,7 +115,7 @@ type ImageBlobUploadAttempt struct {
 	PartCount                *int64
 	LotID                    uuid.UUID
 	FileName                 *string
-	StorageKey               string
+	StorageKey               uuid.UUID
 	Username                 string
 	UploadState              UploadAttemptState
 	Version                  int32
