@@ -22,26 +22,21 @@ type ImageStore struct {
 }
 
 func (imageStore *ImageStore) GeneratePresignedUrl(ctx context.Context, presignRequest *lotimage.GeneratePresignedUrlRequest) (*lotimage.GeneratePresignedUrlResponse, error) {
-
 	duplicateFiles, alreadUploadedFiles, presignedUrls, err := imageStore.initiateUpload(convertToUploadFiles(presignRequest.LotImages), "arn:aws:s3:ap-south-1:433154991296:accesspoint/auction-lot-service-access-point", *presignRequest.LotId)
-
 	if err != nil {
 		return nil, err
 	}
 
 	dulicateImageFiles, err := convertToImageFiles(duplicateFiles)
-
 	if err != nil {
 		return nil, status.Error(codes.Internal, "error converting from duplicatedFiles")
 	}
 	alreadyUploadedImageFiles, err := convertToImageFiles(alreadUploadedFiles)
-
 	if err != nil {
 		return nil, status.Error(codes.Internal, "error converting from alreadyUploadedFiles")
 	}
 
 	presignedImageFiles, err := convertToPresignedImageFiles(presignedUrls)
-
 	if err != nil {
 		return nil, status.Error(codes.Internal, "error converting from alreadyUploadedFiles")
 	}
@@ -136,7 +131,6 @@ func convertToUploadFiles(imageFiles []*lotimage.ImageFile) []UploadFile {
 	uploadFiles := make([]UploadFile, 0, len(imageFiles))
 	for _, image := range imageFiles {
 		uploadFiles = append(uploadFiles, convertToUploadFile(image))
-
 	}
 
 	return uploadFiles
