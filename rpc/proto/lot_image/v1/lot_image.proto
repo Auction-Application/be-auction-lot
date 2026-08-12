@@ -47,16 +47,28 @@ message PresignedFile {
 
 message PresignedUploadUrl {
   oneof presigned_url {
-    PresignedHTTPRequest single = 1;
+    Request single = 1;
     MultiPresignedUploadUrl multi = 2;
   }
 }
 
 message MultiPresignedUploadUrl {
-  repeated PresignedHTTPRequest multi_parts = 1;
+  repeated MultiPresignedHTTPRequest multi_parts = 1;
+  string upload_id = 2;
+  int64 part_size = 3;
 }
 
-message PresignedHTTPRequest {
+message MultiPresignedHTTPRequest {
+  Request request = 1;
+  int32 part = 2;
+}
+
+// message SinglePresignedHTTPRequest {
+//   Request request = 1;
+//   int32 part = 2;
+// }
+
+message Request {
   string url = 1;
   string method = 2;
   map<string, HeaderValues> signed_header = 3;

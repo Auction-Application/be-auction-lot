@@ -79,7 +79,7 @@ func convertToPresignedFile(presignedUrl PresignedFileUrl) (*lotimage.PresignedF
 
 	if presignedUploadUrl.Single != nil {
 		singleUpload := &lotimage.PresignedUploadUrl_Single{
-			Single: convertToLotImagePresignedHttpRequest(presignedUploadUrl.Single),
+			Single: convertToLotImageSinglePresignedHttpRequest(presignedUploadUrl.Single),
 		}
 		presignedImageUploadUrl = &lotimage.PresignedUploadUrl{
 			PresignedUrl: singleUpload,
@@ -89,6 +89,8 @@ func convertToPresignedFile(presignedUrl PresignedFileUrl) (*lotimage.PresignedF
 		multiUpload := &lotimage.PresignedUploadUrl_Multi{
 			Multi: &lotimage.MultiPresignedUploadUrl{
 				MultiParts: convertToLotImageMultiPartPresignedHttpRequest(presignedUploadUrl.Multi),
+				UploadId:   &presignedUrl.Multi.uploadId,
+				PartSize:   &presignedUrl.Multi.partSize,
 			},
 		}
 		presignedImageUploadUrl = &lotimage.PresignedUploadUrl{
@@ -102,7 +104,26 @@ func convertToPresignedFile(presignedUrl PresignedFileUrl) (*lotimage.PresignedF
 	}, nil
 }
 
-func convertToLotImagePresignedHttpRequest(presignedRequest *v4.PresignedHTTPRequest) *lotimage.PresignedHTTPRequest {
+func convertToLotImageMultiPresignedHttpRequest(multiPresignedRequest MultiPresignedRequest) *lotimage.MultiPresignedHTTPRequest {
+	signedHeader := make(map[string]*lotimage.HeaderValues, len(multiPresignedRequest.request.SignedHeader))
+	for key, values := range multiPresignedRequest.request.SignedHeader {
+		signedHeader[key] = &lotimage.HeaderValues{
+			Values: values,
+		}
+	}
+
+	presignRequest := &lotimage.MultiPresignedHTTPRequest{
+		Request: &lotimage.Request{
+			Url:          proto.String(multiPresignedRequest.request.URL),
+			Method:       proto.String(multiPresignedRequest.request.Method),
+			SignedHeader: signedHeader,
+		},
+		Part: proto.Int32(int32(multiPresignedRequest.part)),
+	}
+	return presignRequest
+}
+
+func convertToLotImageSinglePresignedHttpRequest(presignedRequest *v4.PresignedHTTPRequest) *lotimage.Request {
 	signedHeader := make(map[string]*lotimage.HeaderValues, len(presignedRequest.SignedHeader))
 	for key, values := range presignedRequest.SignedHeader {
 		signedHeader[key] = &lotimage.HeaderValues{
@@ -110,18 +131,19 @@ func convertToLotImagePresignedHttpRequest(presignedRequest *v4.PresignedHTTPReq
 		}
 	}
 
-	presignRequest := &lotimage.PresignedHTTPRequest{
+	presignRequest := &lotimage.Request{
 		Url:          proto.String(presignedRequest.URL),
 		Method:       proto.String(presignedRequest.Method),
 		SignedHeader: signedHeader,
 	}
+
 	return presignRequest
 }
 
-func convertToLotImageMultiPartPresignedHttpRequest(presignedRequests []*v4.PresignedHTTPRequest) []*lotimage.PresignedHTTPRequest {
-	lotImagePresignedRequests := make([]*lotimage.PresignedHTTPRequest, 0, len(presignedRequests))
-	for _, request := range presignedRequests {
-		lotImagePresignedRequests = append(lotImagePresignedRequests, convertToLotImagePresignedHttpRequest(request))
+func convertToLotImageMultiPartPresignedHttpRequest(multiPresignedUrl MultiPresignedUrl) []*lotimage.MultiPresignedHTTPRequest {
+	lotImagePresignedRequests := make([]*lotimage.MultiPresignedHTTPRequest, 0, len(multiPresignedUrl.requests))
+	for _, request := range multiPresignedUrl.requests {
+		lotImagePresignedRequests = append(lotImagePresignedRequests, convertToLotImageMultiPresignedHttpRequest(request))
 	}
 
 	return lotImagePresignedRequests

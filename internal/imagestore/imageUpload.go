@@ -78,9 +78,21 @@ type UploadFile struct {
 	FileSize     uint
 }
 
+type MultiPresignedRequest struct {
+	request *v4.PresignedHTTPRequest
+	part    int16
+}
+
+type MultiPresignedUrl struct {
+	requests []MultiPresignedRequest
+	uploadId string
+	partSize int64
+}
+
 type PresignedUploadUrl struct {
 	Single *v4.PresignedHTTPRequest
-	Multi  []*v4.PresignedHTTPRequest
+	// Multi  []*v4.PresignedHTTPRequest
+	Multi MultiPresignedUrl
 }
 
 type PresignedFileUrl struct {
@@ -141,15 +153,16 @@ func (s3Storage S3Storage) generateS3UploadUrl(ctx context.Context, files []Uplo
 	}
 
 	if len(singlePartFileSha256s) > 0 {
-		insertedSinglePartFiles, err := query.InsertSinglePartUpload(context.TODO(), auctionLotTableQuery.InsertSinglePartUploadParams{
-			UploadType:   auctionLotTableQuery.UploadTypeSingleUpload,
-			LotID:        lotId,
-			Username:     "coackroach",
-			Sha256s:      singlePartFileSha256s,
-			FileSizes:    singlePartFileSizes,
-			ContentTypes: singlePartFileContentTypes,
-			FilesNames:   singlePartFileNames,
-		})
+		insertedSinglePartFiles, err := query.InsertSinglePartUpload(context.TODO(),
+			auctionLotTableQuery.InsertSinglePartUploadParams{
+				UploadType:   auctionLotTableQuery.UploadTypeSingleUpload,
+				LotID:        lotId,
+				Username:     "coackroach",
+				Sha256s:      singlePartFileSha256s,
+				FileSizes:    singlePartFileSizes,
+				ContentTypes: singlePartFileContentTypes,
+				FilesNames:   singlePartFileNames,
+			})
 
 		insertedSinglePartFilesMap := make(map[string]uuid.UUID)
 
@@ -217,6 +230,7 @@ type newMultiPartGenerationData struct {
 	uploadId   string
 	storageKey string
 	sha256     string
+	partSize   int64
 }
 
 type resumableValidMultiPartGenerationData = newMultiPartGenerationData
@@ -233,6 +247,7 @@ func segregateMultiUploadFiles(multiUploadResult []auctionLotTableQuery.InsertAn
 				uploadId:   *multiUpload.UploadID,
 				storageKey: multiUpload.StorageKey.String(),
 				sha256:     multiUpload.Sha256,
+				partSize:   *multiUpload.PartSize,
 			})
 		} else if multiUpload.IsValid {
 			resumableMultiUploads = append(resumableMultiUploads, resumableValidMultiPartGenerationData{
@@ -241,6 +256,7 @@ func segregateMultiUploadFiles(multiUploadResult []auctionLotTableQuery.InsertAn
 				uploadId:   *multiUpload.UploadID,
 				storageKey: multiUpload.StorageKey.String(),
 				sha256:     multiUpload.Sha256,
+				partSize:   *multiUpload.PartSize,
 			})
 		}
 	}
@@ -253,7 +269,7 @@ func generateUrlsForNewUploads(newMultiUploads []newMultiPartGenerationData, buc
 ) ([]PresignedFileUrl, error) {
 	result := make([]PresignedFileUrl, 0, len(newMultiUploads))
 	for _, upload := range newMultiUploads {
-		newUrls, err := generateNewMultiPartUploadUrls(context.TODO(), bucketName, upload.storageKey, upload.fileParts,
+		newMultiParts, err := generateNewMultiPartUploadUrls(context.TODO(), bucketName, upload.storageKey, upload.fileParts,
 			upload.uploadId, s3Storage)
 		if err != nil {
 			return nil, err
@@ -261,7 +277,7 @@ func generateUrlsForNewUploads(newMultiUploads []newMultiPartGenerationData, buc
 
 		result = append(result, PresignedFileUrl{
 			UploadFile:         multiFileUploadMap[upload.sha256],
-			PresignedUploadUrl: PresignedUploadUrl{Multi: newUrls},
+			PresignedUploadUrl: PresignedUploadUrl{Multi: MultiPresignedUrl{requests: newMultiParts, uploadId: upload.uploadId, partSize: upload.partSize}},
 		})
 	}
 	return result, nil
@@ -272,14 +288,14 @@ func genrateUrlsForResumableUploads(resumableMultiUploads []resumableValidMultiP
 ) ([]PresignedFileUrl, error) {
 	result := make([]PresignedFileUrl, 0, len(resumableMultiUploads))
 	for _, upload := range resumableMultiUploads {
-		newUrls, err := generateResumeUploadUrls(s3Storage, bucketName, upload.storageKey, upload.uploadId, upload.fileParts)
+		resumeMultiParts, err := generateResumeUploadUrls(s3Storage, bucketName, upload.storageKey, upload.uploadId, upload.fileParts)
 		if err != nil {
 			return nil, err
 		}
 
 		result = append(result, PresignedFileUrl{
 			UploadFile:         multiFileUploadMap[upload.sha256],
-			PresignedUploadUrl: PresignedUploadUrl{Multi: newUrls},
+			PresignedUploadUrl: PresignedUploadUrl{Multi: MultiPresignedUrl{requests: resumeMultiParts, uploadId: upload.uploadId, partSize: upload.partSize}},
 		})
 	}
 
@@ -314,12 +330,13 @@ func generateMultiPartUploadId(ctx context.Context, s3Storage S3Storage, bucketN
 
 func generateNewMultiPartUploadUrls(ctx context.Context, bucketName string, storageKey string, fileParts []int16, uploadId string,
 	s3Storage S3Storage,
-) ([]*v4.PresignedHTTPRequest, error) {
-	allPartUrls := make([]*v4.PresignedHTTPRequest, 0, len(fileParts))
+) ([]MultiPresignedRequest, error) {
+	// multiParts := make([]*v4.PresignedHTTPRequest, 0, len(fileParts))
+	multiParts := make([]MultiPresignedRequest, 0, len(fileParts))
 
 	for _, partNumber := range fileParts {
 
-		presignedUploadPartUrls, err := s3Storage.Presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
+		presignedUploadPartUrl, err := s3Storage.Presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
 			Bucket: &bucketName,
 			Key:    &storageKey, PartNumber: aws.Int32(int32(partNumber)), UploadId: &uploadId,
 		}, s3.WithPresignExpires(presignExpiry))
@@ -328,38 +345,38 @@ func generateNewMultiPartUploadUrls(ctx context.Context, bucketName string, stor
 			return nil, fmt.Errorf("Creating mulipart upload url failed: %w", err)
 		}
 
-		allPartUrls = append(allPartUrls, presignedUploadPartUrls)
+		multiParts = append(multiParts, MultiPresignedRequest{request: presignedUploadPartUrl, part: partNumber})
 
 	}
 
-	return allPartUrls, nil
+	return multiParts, nil
 }
 
 func generateResumeUploadUrls(s3Storage S3Storage, bucketName string, storageKey string, uploadId string,
 	allParts []int16,
-) ([]*v4.PresignedHTTPRequest, error) {
+) ([]MultiPresignedRequest, error) {
 	nonUploadedParts, err := s3Storage.listNotUploadedParts(context.TODO(), bucketName, storageKey, uploadId, allParts)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
 	}
 
-	resumeUrls, err := s3Storage.generateExistingMultiPartPresignedUrl(context.TODO(), bucketName, storageKey, nonUploadedParts, &uploadId)
+	resumeMultiParts, err := s3Storage.generateExistingMultiPartPresignedUrl(context.TODO(), bucketName, storageKey, nonUploadedParts, &uploadId)
 	if err != nil {
 		fmt.Println(err)
 		return nil, err
 	}
 
-	return resumeUrls, nil
+	return resumeMultiParts, nil
 }
 
 func (s3Storage S3Storage) generateExistingMultiPartPresignedUrl(ctx context.Context, bucketName string, objectKey string,
 	nonUploadedParts []int16, uploadId *string,
-) ([]*v4.PresignedHTTPRequest, error) {
-	partUrls := make([]*v4.PresignedHTTPRequest, 0, len(nonUploadedParts))
+) ([]MultiPresignedRequest, error) {
+	multiParts := make([]MultiPresignedRequest, 0, len(nonUploadedParts))
 
 	for _, part := range nonUploadedParts {
-		presignedUploadPartUrls, err := s3Storage.Presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
+		presignedUploadPartUrl, err := s3Storage.Presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
 			Bucket: &bucketName,
 			Key:    &objectKey, PartNumber: aws.Int32(int32(part)), UploadId: uploadId,
 		}, s3.WithPresignExpires(presignExpiry))
@@ -368,10 +385,10 @@ func (s3Storage S3Storage) generateExistingMultiPartPresignedUrl(ctx context.Con
 			return nil, err
 		}
 
-		partUrls = append(partUrls, presignedUploadPartUrls)
+		multiParts = append(multiParts, MultiPresignedRequest{request: presignedUploadPartUrl, part: part})
 	}
 
-	return partUrls, nil
+	return multiParts, nil
 }
 
 func (s3Storage S3Storage) listNotUploadedParts(ctx context.Context, bucketName string, objectKey string, uploadId string, allParts []int16) ([]int16, error) {
