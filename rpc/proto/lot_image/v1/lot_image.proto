@@ -26,12 +26,27 @@ message GeneratePresignedUrlRequest {
 
 service LotImageService {
   rpc GeneratePresignedUrl(GeneratePresignedUrlRequest) returns (GeneratePresignedUrlResponse);
+  rpc CompleteMultiPartUpload(CompleteMultiPartUploadRequest) returns (CompleteMultiPartUploadResponse);
 }
 
 message GeneratePresignedUrlResponse {
   bool success = 1;
   string message = 2;
   PresignFileResult presign_result = 3;
+}
+message CompleteMultiPartUploadRequest {
+  int64 multipart_attempt_id = 1;
+  repeated PartEtag part_etags = 2;
+}
+
+message PartEtag {
+  string etag = 1;
+  int32 part = 2;
+}
+
+message CompleteMultiPartUploadResponse {
+  bool success = 1;
+  string message = 2;
 }
 
 message PresignFileResult {
@@ -56,17 +71,13 @@ message MultiPresignedUploadUrl {
   repeated MultiPresignedHTTPRequest multi_parts = 1;
   string upload_id = 2;
   int64 part_size = 3;
+  int64 multipart_attempt_id = 4;
 }
 
 message MultiPresignedHTTPRequest {
   Request request = 1;
   int32 part = 2;
 }
-
-// message SinglePresignedHTTPRequest {
-//   Request request = 1;
-//   int32 part = 2;
-// }
 
 message Request {
   string url = 1;

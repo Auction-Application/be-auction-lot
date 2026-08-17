@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	LotImageService_GeneratePresignedUrl_FullMethodName = "/lot_image.v1.LotImageService/GeneratePresignedUrl"
+	LotImageService_GeneratePresignedUrl_FullMethodName    = "/lot_image.v1.LotImageService/GeneratePresignedUrl"
+	LotImageService_CompleteMultiPartUpload_FullMethodName = "/lot_image.v1.LotImageService/CompleteMultiPartUpload"
 )
 
 // LotImageServiceClient is the client API for LotImageService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type LotImageServiceClient interface {
 	GeneratePresignedUrl(ctx context.Context, in *GeneratePresignedUrlRequest, opts ...grpc.CallOption) (*GeneratePresignedUrlResponse, error)
+	CompleteMultiPartUpload(ctx context.Context, in *CompleteMultiPartUploadRequest, opts ...grpc.CallOption) (*CompleteMultiPartUploadResponse, error)
 }
 
 type lotImageServiceClient struct {
@@ -47,11 +49,22 @@ func (c *lotImageServiceClient) GeneratePresignedUrl(ctx context.Context, in *Ge
 	return out, nil
 }
 
+func (c *lotImageServiceClient) CompleteMultiPartUpload(ctx context.Context, in *CompleteMultiPartUploadRequest, opts ...grpc.CallOption) (*CompleteMultiPartUploadResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompleteMultiPartUploadResponse)
+	err := c.cc.Invoke(ctx, LotImageService_CompleteMultiPartUpload_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // LotImageServiceServer is the server API for LotImageService service.
 // All implementations must embed UnimplementedLotImageServiceServer
 // for forward compatibility.
 type LotImageServiceServer interface {
 	GeneratePresignedUrl(context.Context, *GeneratePresignedUrlRequest) (*GeneratePresignedUrlResponse, error)
+	CompleteMultiPartUpload(context.Context, *CompleteMultiPartUploadRequest) (*CompleteMultiPartUploadResponse, error)
 	mustEmbedUnimplementedLotImageServiceServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedLotImageServiceServer struct{}
 
 func (UnimplementedLotImageServiceServer) GeneratePresignedUrl(context.Context, *GeneratePresignedUrlRequest) (*GeneratePresignedUrlResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GeneratePresignedUrl not implemented")
+}
+func (UnimplementedLotImageServiceServer) CompleteMultiPartUpload(context.Context, *CompleteMultiPartUploadRequest) (*CompleteMultiPartUploadResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CompleteMultiPartUpload not implemented")
 }
 func (UnimplementedLotImageServiceServer) mustEmbedUnimplementedLotImageServiceServer() {}
 func (UnimplementedLotImageServiceServer) testEmbeddedByValue()                         {}
@@ -104,6 +120,24 @@ func _LotImageService_GeneratePresignedUrl_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _LotImageService_CompleteMultiPartUpload_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteMultiPartUploadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(LotImageServiceServer).CompleteMultiPartUpload(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: LotImageService_CompleteMultiPartUpload_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(LotImageServiceServer).CompleteMultiPartUpload(ctx, req.(*CompleteMultiPartUploadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // LotImageService_ServiceDesc is the grpc.ServiceDesc for LotImageService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var LotImageService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GeneratePresignedUrl",
 			Handler:    _LotImageService_GeneratePresignedUrl_Handler,
+		},
+		{
+			MethodName: "CompleteMultiPartUpload",
+			Handler:    _LotImageService_CompleteMultiPartUpload_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

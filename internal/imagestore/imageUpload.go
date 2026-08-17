@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/Auction-Application/be-auction-item/internal/database/auctionLotTableQuery"
@@ -13,8 +14,12 @@ import (
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const (
@@ -84,15 +89,15 @@ type MultiPresignedRequest struct {
 }
 
 type MultiPresignedUrl struct {
-	requests []MultiPresignedRequest
-	uploadId string
-	partSize int64
+	requests           []MultiPresignedRequest
+	uploadId           string
+	multipartAttemptId int64
+	partSize           int64
 }
 
 type PresignedUploadUrl struct {
 	Single *v4.PresignedHTTPRequest
-	// Multi  []*v4.PresignedHTTPRequest
-	Multi MultiPresignedUrl
+	Multi  MultiPresignedUrl
 }
 
 type PresignedFileUrl struct {
@@ -225,12 +230,13 @@ func (s3Storage S3Storage) generateS3UploadUrl(ctx context.Context, files []Uplo
 }
 
 type newMultiPartGenerationData struct {
-	objectKey  string
-	fileParts  []int16
-	uploadId   string
-	storageKey string
-	sha256     string
-	partSize   int64
+	objectKey          string
+	fileParts          []int16
+	uploadId           string
+	storageKey         string
+	sha256             string
+	partSize           int64
+	multipartAttemptId int64
 }
 
 type resumableValidMultiPartGenerationData = newMultiPartGenerationData
@@ -242,21 +248,23 @@ func segregateMultiUploadFiles(multiUploadResult []auctionLotTableQuery.InsertAn
 	for _, multiUpload := range multiUploadResult {
 		if multiUpload.IsInserted || (!multiUpload.IsInserted && !multiUpload.IsValid) {
 			newMultiUploads = append(newMultiUploads, newMultiPartGenerationData{
-				objectKey:  multiUpload.StorageKey.String(),
-				fileParts:  multiUpload.Parts,
-				uploadId:   *multiUpload.UploadID,
-				storageKey: multiUpload.StorageKey.String(),
-				sha256:     multiUpload.Sha256,
-				partSize:   *multiUpload.PartSize,
+				objectKey:          multiUpload.StorageKey.String(),
+				fileParts:          multiUpload.Parts,
+				uploadId:           *multiUpload.UploadID,
+				storageKey:         multiUpload.StorageKey.String(),
+				sha256:             multiUpload.Sha256,
+				partSize:           *multiUpload.PartSize,
+				multipartAttemptId: multiUpload.ImageBlobUploadAttemptID,
 			})
 		} else if multiUpload.IsValid {
 			resumableMultiUploads = append(resumableMultiUploads, resumableValidMultiPartGenerationData{
-				objectKey:  multiUpload.StorageKey.String(),
-				fileParts:  multiUpload.Parts,
-				uploadId:   *multiUpload.UploadID,
-				storageKey: multiUpload.StorageKey.String(),
-				sha256:     multiUpload.Sha256,
-				partSize:   *multiUpload.PartSize,
+				objectKey:          multiUpload.StorageKey.String(),
+				fileParts:          multiUpload.Parts,
+				uploadId:           *multiUpload.UploadID,
+				storageKey:         multiUpload.StorageKey.String(),
+				sha256:             multiUpload.Sha256,
+				partSize:           *multiUpload.PartSize,
+				multipartAttemptId: multiUpload.ImageBlobUploadAttemptID,
 			})
 		}
 	}
@@ -277,7 +285,7 @@ func generateUrlsForNewUploads(newMultiUploads []newMultiPartGenerationData, buc
 
 		result = append(result, PresignedFileUrl{
 			UploadFile:         multiFileUploadMap[upload.sha256],
-			PresignedUploadUrl: PresignedUploadUrl{Multi: MultiPresignedUrl{requests: newMultiParts, uploadId: upload.uploadId, partSize: upload.partSize}},
+			PresignedUploadUrl: PresignedUploadUrl{Multi: MultiPresignedUrl{requests: newMultiParts, uploadId: upload.uploadId, partSize: upload.partSize, multipartAttemptId: upload.multipartAttemptId}},
 		})
 	}
 	return result, nil
@@ -295,7 +303,7 @@ func genrateUrlsForResumableUploads(resumableMultiUploads []resumableValidMultiP
 
 		result = append(result, PresignedFileUrl{
 			UploadFile:         multiFileUploadMap[upload.sha256],
-			PresignedUploadUrl: PresignedUploadUrl{Multi: MultiPresignedUrl{requests: resumeMultiParts, uploadId: upload.uploadId, partSize: upload.partSize}},
+			PresignedUploadUrl: PresignedUploadUrl{Multi: MultiPresignedUrl{requests: resumeMultiParts, uploadId: upload.uploadId, partSize: upload.partSize, multipartAttemptId: upload.multipartAttemptId}},
 		})
 	}
 
@@ -331,7 +339,6 @@ func generateMultiPartUploadId(ctx context.Context, s3Storage S3Storage, bucketN
 func generateNewMultiPartUploadUrls(ctx context.Context, bucketName string, storageKey string, fileParts []int16, uploadId string,
 	s3Storage S3Storage,
 ) ([]MultiPresignedRequest, error) {
-	// multiParts := make([]*v4.PresignedHTTPRequest, 0, len(fileParts))
 	multiParts := make([]MultiPresignedRequest, 0, len(fileParts))
 
 	for _, partNumber := range fileParts {
@@ -443,6 +450,50 @@ func IntentBatchUpload(fileToUpload []UploadFile) ([]UploadFile, []DuplicateFile
 	}
 
 	return files, duplicateFiles
+}
+
+func (imageStore *ImageStore) completeMultiPartUpload(multipartAttemptId int64, bucketName string, etagParts []types.CompletedPart) error {
+	multiPartItem, err := imageStore.dbStorageQuery.GetMultiPartUploadItem(context.TODO(), multipartAttemptId)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	slices.SortFunc(etagParts, func(a, b types.CompletedPart) int {
+		return int(*a.PartNumber) - int(*b.PartNumber)
+	})
+
+	partOutput, err := imageStore.s3Storage.s3Client.ListParts(context.TODO(), &s3.ListPartsInput{
+		Bucket:   &bucketName,
+		Key:      aws.String(multiPartItem.StorageKey.String()),
+		UploadId: multiPartItem.UploadID,
+	})
+	if err != nil {
+		fmt.Println(err)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return status.Error(codes.NotFound, "upload attempt not found")
+		}
+		return err
+	}
+
+	if len(partOutput.Parts) != int(*multiPartItem.PartCount) {
+		fmt.Println("All the parts have not been uploaded")
+		return errors.New("All the parts have not been uploaded")
+	}
+
+	_, err = imageStore.s3Storage.s3Client.CompleteMultipartUpload(context.TODO(), &s3.CompleteMultipartUploadInput{
+		Bucket:   &bucketName,
+		Key:      aws.String(multiPartItem.StorageKey.String()),
+		UploadId: multiPartItem.UploadID,
+		MultipartUpload: &types.CompletedMultipartUpload{
+			Parts: etagParts,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (imageStore *ImageStore) initiateUpload(fileToUpload []UploadFile, bucketName string, lotId string) ([]DuplicateFile, []AlreadyUploadedFile, []PresignedFileUrl, error) {

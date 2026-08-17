@@ -8,6 +8,7 @@ import (
 	"github.com/Auction-Application/be-auction-item/internal/database/auctionLotTableQuery"
 	lotimage "github.com/Auction-Application/be-auction-item/rpc/gen/lot_image/v1"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -19,6 +20,36 @@ type ImageStore struct {
 	dbStorageQuery *auctionLotTableQuery.Queries
 	s3Storage      *S3Storage
 	conn           *pgx.Conn
+}
+
+type EtagPart struct {
+	part int32
+	etag string
+}
+
+func (imageStore *ImageStore) CompleteMultiPartUpload(ctx context.Context, completeMultipartRequest *lotimage.CompleteMultiPartUploadRequest) (*lotimage.CompleteMultiPartUploadResponse, error) {
+	etagParts := convertToCompletedPart(completeMultipartRequest.PartEtags)
+	err := imageStore.completeMultiPartUpload(*completeMultipartRequest.MultipartAttemptId, "arn:aws:s3:ap-south-1:433154991296:accesspoint/auction-lot-service-access-point", etagParts)
+	if err != nil {
+		return nil, err
+	}
+
+	return &lotimage.CompleteMultiPartUploadResponse{
+		Success: proto.Bool(true),
+		Message: proto.String("Upload Completed"),
+	}, nil
+}
+
+func convertToCompletedPart(wireFormatEtagParts []*lotimage.PartEtag) []types.CompletedPart {
+	etagParts := make([]types.CompletedPart, 0, len(wireFormatEtagParts))
+	for _, etagPart := range wireFormatEtagParts {
+		etagParts = append(etagParts, types.CompletedPart{
+			ETag:       etagPart.Etag,
+			PartNumber: etagPart.Part,
+		})
+	}
+
+	return etagParts
 }
 
 func (imageStore *ImageStore) GeneratePresignedUrl(ctx context.Context, presignRequest *lotimage.GeneratePresignedUrlRequest) (*lotimage.GeneratePresignedUrlResponse, error) {
@@ -88,9 +119,10 @@ func convertToPresignedFile(presignedUrl PresignedFileUrl) (*lotimage.PresignedF
 	} else {
 		multiUpload := &lotimage.PresignedUploadUrl_Multi{
 			Multi: &lotimage.MultiPresignedUploadUrl{
-				MultiParts: convertToLotImageMultiPartPresignedHttpRequest(presignedUploadUrl.Multi),
-				UploadId:   &presignedUrl.Multi.uploadId,
-				PartSize:   &presignedUrl.Multi.partSize,
+				MultiParts:         convertToLotImageMultiPartPresignedHttpRequest(presignedUploadUrl.Multi),
+				UploadId:           &presignedUrl.Multi.uploadId,
+				MultipartAttemptId: &presignedUploadUrl.Multi.multipartAttemptId,
+				PartSize:           &presignedUrl.Multi.partSize,
 			},
 		}
 		presignedImageUploadUrl = &lotimage.PresignedUploadUrl{
