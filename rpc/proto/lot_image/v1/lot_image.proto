@@ -69,9 +69,8 @@ message PresignedUploadUrl {
 
 message MultiPresignedUploadUrl {
   repeated MultiPresignedHTTPRequest multi_parts = 1;
-  string upload_id = 2;
-  int64 part_size = 3;
-  int64 multipart_attempt_id = 4;
+  int64 part_size = 2;
+  int64 multipart_attempt_id = 3;
 }
 
 message MultiPresignedHTTPRequest {

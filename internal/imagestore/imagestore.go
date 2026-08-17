@@ -119,8 +119,8 @@ func convertToPresignedFile(presignedUrl PresignedFileUrl) (*lotimage.PresignedF
 	} else {
 		multiUpload := &lotimage.PresignedUploadUrl_Multi{
 			Multi: &lotimage.MultiPresignedUploadUrl{
-				MultiParts:         convertToLotImageMultiPartPresignedHttpRequest(presignedUploadUrl.Multi),
-				UploadId:           &presignedUrl.Multi.uploadId,
+				MultiParts: convertToLotImageMultiPartPresignedHttpRequest(presignedUploadUrl.Multi),
+				// UploadId:           &presignedUrl.Multi.uploadId,
 				MultipartAttemptId: &presignedUploadUrl.Multi.multipartAttemptId,
 				PartSize:           &presignedUrl.Multi.partSize,
 			},

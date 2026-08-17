@@ -90,7 +90,6 @@ type MultiPresignedRequest struct {
 
 type MultiPresignedUrl struct {
 	requests           []MultiPresignedRequest
-	uploadId           string
 	multipartAttemptId int64
 	partSize           int64
 }
@@ -284,8 +283,11 @@ func generateUrlsForNewUploads(newMultiUploads []newMultiPartGenerationData, buc
 		}
 
 		result = append(result, PresignedFileUrl{
-			UploadFile:         multiFileUploadMap[upload.sha256],
-			PresignedUploadUrl: PresignedUploadUrl{Multi: MultiPresignedUrl{requests: newMultiParts, uploadId: upload.uploadId, partSize: upload.partSize, multipartAttemptId: upload.multipartAttemptId}},
+			UploadFile: multiFileUploadMap[upload.sha256],
+			PresignedUploadUrl: PresignedUploadUrl{Multi: MultiPresignedUrl{
+				requests: newMultiParts,
+				partSize: upload.partSize, multipartAttemptId: upload.multipartAttemptId,
+			}},
 		})
 	}
 	return result, nil
@@ -302,8 +304,11 @@ func genrateUrlsForResumableUploads(resumableMultiUploads []resumableValidMultiP
 		}
 
 		result = append(result, PresignedFileUrl{
-			UploadFile:         multiFileUploadMap[upload.sha256],
-			PresignedUploadUrl: PresignedUploadUrl{Multi: MultiPresignedUrl{requests: resumeMultiParts, uploadId: upload.uploadId, partSize: upload.partSize, multipartAttemptId: upload.multipartAttemptId}},
+			UploadFile: multiFileUploadMap[upload.sha256],
+			PresignedUploadUrl: PresignedUploadUrl{Multi: MultiPresignedUrl{
+				requests: resumeMultiParts,
+				partSize: upload.partSize, multipartAttemptId: upload.multipartAttemptId,
+			}},
 		})
 	}
 

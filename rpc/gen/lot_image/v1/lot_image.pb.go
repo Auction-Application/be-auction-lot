@@ -555,9 +555,8 @@ func (*PresignedUploadUrl_Multi) isPresignedUploadUrl_PresignedUrl() {}
 type MultiPresignedUploadUrl struct {
 	state              protoimpl.MessageState       `protogen:"open.v1"`
 	MultiParts         []*MultiPresignedHTTPRequest `protobuf:"bytes,1,rep,name=multi_parts,json=multiParts" json:"multi_parts,omitempty"`
-	UploadId           *string                      `protobuf:"bytes,2,opt,name=upload_id,json=uploadId" json:"upload_id,omitempty"`
-	PartSize           *int64                       `protobuf:"varint,3,opt,name=part_size,json=partSize" json:"part_size,omitempty"`
-	MultipartAttemptId *int64                       `protobuf:"varint,4,opt,name=multipart_attempt_id,json=multipartAttemptId" json:"multipart_attempt_id,omitempty"`
+	PartSize           *int64                       `protobuf:"varint,2,opt,name=part_size,json=partSize" json:"part_size,omitempty"`
+	MultipartAttemptId *int64                       `protobuf:"varint,3,opt,name=multipart_attempt_id,json=multipartAttemptId" json:"multipart_attempt_id,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -597,13 +596,6 @@ func (x *MultiPresignedUploadUrl) GetMultiParts() []*MultiPresignedHTTPRequest {
 		return x.MultiParts
 	}
 	return nil
-}
-
-func (x *MultiPresignedUploadUrl) GetUploadId() string {
-	if x != nil && x.UploadId != nil {
-		return *x.UploadId
-	}
-	return ""
 }
 
 func (x *MultiPresignedUploadUrl) GetPartSize() int64 {
@@ -817,13 +809,12 @@ const file_lot_image_v1_lot_image_proto_rawDesc = "" +
 	"\x12PresignedUploadUrl\x12/\n" +
 	"\x06single\x18\x01 \x01(\v2\x15.lot_image.v1.RequestH\x00R\x06single\x12=\n" +
 	"\x05multi\x18\x02 \x01(\v2%.lot_image.v1.MultiPresignedUploadUrlH\x00R\x05multiB\x0f\n" +
-	"\rpresigned_url\"\xcf\x01\n" +
+	"\rpresigned_url\"\xb2\x01\n" +
 	"\x17MultiPresignedUploadUrl\x12H\n" +
 	"\vmulti_parts\x18\x01 \x03(\v2'.lot_image.v1.MultiPresignedHTTPRequestR\n" +
 	"multiParts\x12\x1b\n" +
-	"\tupload_id\x18\x02 \x01(\tR\buploadId\x12\x1b\n" +
-	"\tpart_size\x18\x03 \x01(\x03R\bpartSize\x120\n" +
-	"\x14multipart_attempt_id\x18\x04 \x01(\x03R\x12multipartAttemptId\"`\n" +
+	"\tpart_size\x18\x02 \x01(\x03R\bpartSize\x120\n" +
+	"\x14multipart_attempt_id\x18\x03 \x01(\x03R\x12multipartAttemptId\"`\n" +
 	"\x19MultiPresignedHTTPRequest\x12/\n" +
 	"\arequest\x18\x01 \x01(\v2\x15.lot_image.v1.RequestR\arequest\x12\x12\n" +
 	"\x04part\x18\x02 \x01(\x05R\x04part\"\xde\x01\n" +
