@@ -1,0 +1,1 @@
+alter table image_blob_upload_attempts drop column if exists verified restrict;
