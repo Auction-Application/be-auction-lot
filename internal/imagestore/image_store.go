@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/Auction-Application/be-auction-item/internal/database/auctionLotTableQuery"
+	"github.com/Auction-Application/be-auction-item/internal/database/filestore"
 	lotimage "github.com/Auction-Application/be-auction-item/rpc/gen/lot_image/v1"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
@@ -17,7 +17,7 @@ import (
 
 type ImageStore struct {
 	lotimage.UnimplementedLotImageServiceServer
-	dbStorageQuery *auctionLotTableQuery.Queries
+	dbStorageQuery *filestore.Queries
 	s3Storage      *s3Storage
 	conn           *pgx.Conn
 }
@@ -234,7 +234,7 @@ func NewImageStore(databaseConnection *pgx.Conn) *ImageStore {
 		return nil
 	}
 	return &ImageStore{
-		dbStorageQuery: auctionLotTableQuery.New(databaseConnection),
+		dbStorageQuery: filestore.New(databaseConnection),
 		s3Storage:      s3Storage,
 		conn:           databaseConnection,
 	}

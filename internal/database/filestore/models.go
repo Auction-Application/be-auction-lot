@@ -2,7 +2,7 @@
 // versions:
 //   sqlc v1.31.1
 
-package auctionLotTableQuery
+package filestore
 
 import (
 	"database/sql/driver"
@@ -120,6 +120,7 @@ type ImageBlobUploadAttempt struct {
 	UploadState              UploadAttemptState
 	Version                  int32
 	ValidUntil               pgtype.Timestamptz
+	Verified                 *bool
 }
 
 type Lot struct {

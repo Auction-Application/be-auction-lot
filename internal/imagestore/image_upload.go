@@ -8,7 +8,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/Auction-Application/be-auction-item/internal/database/auctionLotTableQuery"
+	"github.com/Auction-Application/be-auction-item/internal/database/filestore"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -76,7 +76,7 @@ type presignedFileUrl struct {
 type multiUploadFile = uploadFile
 
 func (s3Storage s3Storage) generateS3UploadUrl(ctx context.Context, files []uploadFile,
-	lotId uuid.UUID, query *auctionLotTableQuery.Queries,
+	lotId uuid.UUID, query *filestore.Queries,
 ) ([]presignedFileUrl, error) {
 	fileUploads := make([]presignedFileUrl, 0, len(files))
 
@@ -128,8 +128,8 @@ func (s3Storage s3Storage) generateS3UploadUrl(ctx context.Context, files []uplo
 
 	if len(singlePartFileSha256s) > 0 {
 		insertedSinglePartFiles, err := query.InsertSinglePartUpload(context.TODO(),
-			auctionLotTableQuery.InsertSinglePartUploadParams{
-				UploadType:   auctionLotTableQuery.UploadTypeSingleUpload,
+			filestore.InsertSinglePartUploadParams{
+				UploadType:   filestore.UploadTypeSingleUpload,
 				LotID:        lotId,
 				Username:     "coackroach",
 				Sha256s:      singlePartFileSha256s,
@@ -166,8 +166,8 @@ func (s3Storage s3Storage) generateS3UploadUrl(ctx context.Context, files []uplo
 
 	if len(multiPartFileSha256s) > 0 {
 		multiUploadResult, err := query.InsertAndValidateMultiPartUpload(
-			context.TODO(), auctionLotTableQuery.InsertAndValidateMultiPartUploadParams{
-				UploadType:   auctionLotTableQuery.UploadTypeMultiUpload,
+			context.TODO(), filestore.InsertAndValidateMultiPartUploadParams{
+				UploadType:   filestore.UploadTypeMultiUpload,
 				PartSize:     partSize,
 				LotID:        lotId,
 				Username:     "dummyUsername",
@@ -210,7 +210,7 @@ type newMultiPartGenerationData struct {
 
 type resumableValidMultiPartGenerationData = newMultiPartGenerationData
 
-func segregateMultiUploadFiles(multiUploadResult []auctionLotTableQuery.InsertAndValidateMultiPartUploadRow) ([]newMultiPartGenerationData, []resumableValidMultiPartGenerationData) {
+func segregateMultiUploadFiles(multiUploadResult []filestore.InsertAndValidateMultiPartUploadRow) ([]newMultiPartGenerationData, []resumableValidMultiPartGenerationData) {
 	newMultiUploads := make([]newMultiPartGenerationData, 0)
 	resumableMultiUploads := make([]resumableValidMultiPartGenerationData, 0)
 
@@ -511,7 +511,7 @@ func (imageStore *ImageStore) initiateUpload(fileToUpload []uploadFile, lotId st
 
 type alreadyUploadedFile = uploadFile
 
-func skipUploadForIdenticalImageBlobs(files []uploadFile, lotId uuid.UUID, query *auctionLotTableQuery.Queries) ([]uploadFile, []alreadyUploadedFile, error) {
+func skipUploadForIdenticalImageBlobs(files []uploadFile, lotId uuid.UUID, query *filestore.Queries) ([]uploadFile, []alreadyUploadedFile, error) {
 	sha256s := make([]string, 0, len(files))
 	fileNames := make([]string, 0, len(files))
 
@@ -522,7 +522,7 @@ func skipUploadForIdenticalImageBlobs(files []uploadFile, lotId uuid.UUID, query
 		fileMap[f.Sha256] = f
 	}
 
-	identicalBlobs, err := query.InsertIdenticalImageBlobsToLotImages(context.TODO(), auctionLotTableQuery.InsertIdenticalImageBlobsToLotImagesParams{
+	identicalBlobs, err := query.InsertIdenticalImageBlobsToLotImages(context.TODO(), filestore.InsertIdenticalImageBlobsToLotImagesParams{
 		Sha256s:   sha256s,
 		LotID:     lotId,
 		FileNames: fileNames,
@@ -531,7 +531,7 @@ func skipUploadForIdenticalImageBlobs(files []uploadFile, lotId uuid.UUID, query
 		return nil, nil, err
 	}
 
-	existingFileMap := make(map[string]auctionLotTableQuery.InsertIdenticalImageBlobsToLotImagesRow, len(identicalBlobs))
+	existingFileMap := make(map[string]filestore.InsertIdenticalImageBlobsToLotImagesRow, len(identicalBlobs))
 
 	for _, exisitingFile := range identicalBlobs {
 		existingFileMap[exisitingFile.Sha256] = exisitingFile
@@ -542,7 +542,7 @@ func skipUploadForIdenticalImageBlobs(files []uploadFile, lotId uuid.UUID, query
 	return needToBeUploadedFiles, alreadyUploadedFiles, nil
 }
 
-func separateUploadedAndNeedToBeUploadedFiles(fileMap map[string]uploadFile, existingFileMap map[string]auctionLotTableQuery.InsertIdenticalImageBlobsToLotImagesRow) ([]uploadFile, []alreadyUploadedFile) {
+func separateUploadedAndNeedToBeUploadedFiles(fileMap map[string]uploadFile, existingFileMap map[string]filestore.InsertIdenticalImageBlobsToLotImagesRow) ([]uploadFile, []alreadyUploadedFile) {
 	var alreadyUploadedFiles []alreadyUploadedFile
 	var needToBeUploadedFiles []uploadFile
 	for _, file := range fileMap {
