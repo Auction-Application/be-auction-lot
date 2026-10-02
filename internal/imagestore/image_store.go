@@ -24,7 +24,7 @@ type ImageStore struct {
 
 func (imageStore *ImageStore) CompleteMultiPartUpload(ctx context.Context, completeMultipartRequest *lotimage.CompleteMultiPartUploadRequest) (*lotimage.CompleteMultiPartUploadResponse, error) {
 	etagParts := convertToCompletedPart(completeMultipartRequest.PartEtags)
-	err := imageStore.completeMultiPartUpload(*completeMultipartRequest.MultipartAttemptId, "arn:aws:s3:ap-south-1:433154991296:accesspoint/auction-lot-service-access-point", etagParts)
+	err := imageStore.completeMultiPartUpload(ctx, *completeMultipartRequest.MultipartAttemptId, "arn:aws:s3:ap-south-1:433154991296:accesspoint/auction-lot-service-access-point", etagParts)
 	if err != nil {
 		return nil, err
 	}
