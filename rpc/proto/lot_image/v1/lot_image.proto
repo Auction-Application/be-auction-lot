@@ -62,7 +62,7 @@ message PresignedFile {
 
 message PresignedUploadUrl {
   oneof presigned_url {
-    Request single = 1;
+    SinglePresignedUploadUrl single = 1;
     MultiPresignedUploadUrl multi = 2;
   }
 }
@@ -71,6 +71,10 @@ message MultiPresignedUploadUrl {
   repeated MultiPresignedHTTPRequest multi_parts = 1;
   int64 part_size = 2;
   int64 multipart_attempt_id = 3;
+}
+
+message SinglePresignedUploadUrl {
+  Request request = 1;
 }
 
 message MultiPresignedHTTPRequest {

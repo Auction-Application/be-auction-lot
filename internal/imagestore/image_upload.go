@@ -2,6 +2,8 @@ package imagestore
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log"
@@ -64,8 +66,12 @@ type multiPresignedUrl struct {
 	partSize           int64
 }
 
+type singlePresignedUrl struct {
+	request *v4.PresignedHTTPRequest
+}
+
 type presignedUploadUrl struct {
-	Single *v4.PresignedHTTPRequest
+	Single singlePresignedUrl
 	Multi  multiPresignedUrl
 }
 
@@ -174,7 +180,7 @@ func (s3Storage s3Storage) createSinglePresignedFileUrl(ctx context.Context,
 
 	for _, singleUploadFile := range singleFileData.singleFileUploads {
 		notMultipartFileUpload, err := s3Storage.generateSinglePresignedPutObjectUrl(ctx,
-			insertedSinglePartFilesMap[singleUploadFile.Sha256].String())
+			insertedSinglePartFilesMap[singleUploadFile.Sha256].String(), singleUploadFile.Sha256)
 		if err != nil {
 			fmt.Println("Error")
 			fmt.Println(err)
@@ -182,7 +188,7 @@ func (s3Storage s3Storage) createSinglePresignedFileUrl(ctx context.Context,
 		}
 		singlePresignedFileUrls = append(singlePresignedFileUrls, presignedFileUrl{
 			uploadFile:         singleUploadFile,
-			presignedUploadUrl: presignedUploadUrl{Single: notMultipartFileUpload},
+			presignedUploadUrl: presignedUploadUrl{Single: singlePresignedUrl{request: notMultipartFileUpload.request}},
 		})
 
 	}
@@ -368,20 +374,43 @@ func genrateUrlsForResumableUploads(ctx context.Context, resumableMultiUploads [
 	return result, nil
 }
 
+type singlePresignedUrlData struct {
+	request *v4.PresignedHTTPRequest
+}
+
 func (s3Storage s3Storage) generateSinglePresignedPutObjectUrl(
-	ctx context.Context, objectKey string,
-) (*v4.PresignedHTTPRequest,
+	ctx context.Context, objectKey string, sha256 string,
+) (singlePresignedUrlData,
 	error,
 ) {
+	base64EncodedSha256, err := hexToBase64(sha256)
+	if err != nil {
+		return singlePresignedUrlData{}, err
+	}
 	presignResult, err := s3Storage.Presigner.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(s3Storage.bucketName),
-		Key:    aws.String(objectKey),
-	}, s3.WithPresignExpires(presignExpiry))
+		Bucket:            aws.String(s3Storage.bucketName),
+		Key:               aws.String(objectKey),
+		ChecksumAlgorithm: types.ChecksumAlgorithmSha256,
+		ChecksumSHA256:    &base64EncodedSha256,
+	}, s3.WithPresignExpires(presignExpiry), func(o *s3.PresignOptions) {
+		o.Presigner = v4.NewSigner(func(signer *v4.SignerOptions) {
+			signer.DisableHeaderHoisting = true
+		})
+	})
 	if err != nil {
 		log.Printf("Couldn't get a presigned request to put %v:%v. Here's why: %v\n",
 			s3Storage.bucketName, objectKey, err)
+		return singlePresignedUrlData{}, err
 	}
-	return presignResult, err
+	return singlePresignedUrlData{request: presignResult}, err
+}
+
+func hexToBase64(hexString string) (string, error) {
+	hexByte, err := hex.DecodeString(hexString)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(hexByte), nil
 }
 
 func (s3Storage s3Storage) generateMultiPartUploadId(ctx context.Context, objectKey string) (string, error) {

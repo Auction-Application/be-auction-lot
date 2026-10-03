@@ -103,9 +103,11 @@ func convertToPresignedFile(presignedUrl presignedFileUrl) (*lotimage.PresignedF
 
 	var presignedImageUploadUrl *lotimage.PresignedUploadUrl
 
-	if presignedUploadUrl.Single != nil {
+	if presignedUploadUrl.Single.request != nil {
 		singleUpload := &lotimage.PresignedUploadUrl_Single{
-			Single: convertToLotImageSinglePresignedHttpRequest(presignedUploadUrl.Single),
+			Single: &lotimage.SinglePresignedUploadUrl{
+				Request: convertToLotImageSinglePresignedHttpRequest(presignedUploadUrl.Single.request),
+			},
 		}
 		presignedImageUploadUrl = &lotimage.PresignedUploadUrl{
 			PresignedUrl: singleUpload,
