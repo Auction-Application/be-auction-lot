@@ -46,10 +46,6 @@ services:
       - broker
     environment:
       DYNAMIC_CONFIG_ENABLED: 'true'
-      KAFKA_CLUSTERS_0_NAME: localKafka
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: broker:29092
-      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: localDebezium
-      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://debezium:8083
     volumes:
       - ~/docker-storage/kafka-ui/config.yml:/etc/kafkaui/dynamic_config.yaml
 volumes:
