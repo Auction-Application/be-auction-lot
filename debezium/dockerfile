@@ -1,0 +1,9 @@
+# Stage 1: resolve the Confluent Protobuf converter and its dependencies
+FROM maven:3.9-eclipse-temurin-21 AS deps
+WORKDIR /build
+COPY pom.xml .
+RUN mvn -q dependency:copy-dependencies -DoutputDirectory=/out -DincludeScope=runtime
+
+# Stage 2: Debezium Connect image with the converter on the plugin path
+FROM quay.io/debezium/connect:3.7.0.Final
+COPY --from=deps /out/ /kafka/connect/confluent-protobuf-converter/

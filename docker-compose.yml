@@ -1,8 +1,10 @@
 services:
   debezium:
-    image: quay.io/debezium/connect:3.7.0.Final
+    build: ./debezium
+    image: debezium-connect-protobuf:3.7.0.Final
     depends_on:
       - broker
+      - schema-registry
     container_name: debezium
     ports:
       - 8083:8083
@@ -14,6 +16,25 @@ services:
       CONNECT_CONFIG_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_OFFSET_STORAGE_REPLICATION_FACTOR: 1
       CONNECT_STATUS_STORAGE_REPLICATION_FACTOR: 1
+      KEY_CONVERTER: io.confluent.connect.protobuf.ProtobufConverter
+      VALUE_CONVERTER: io.confluent.connect.protobuf.ProtobufConverter
+      CONNECT_KEY_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+      CONNECT_VALUE_CONVERTER_SCHEMA_REGISTRY_URL: http://schema-registry:8081
+
+  schema-registry:
+    image: confluentinc/cp-schema-registry:8.0.0
+    container_name: schema-registry
+    depends_on:
+      - broker
+    ports:
+      - 8081:8081
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: broker:29092
+      SCHEMA_REGISTRY_KAFKASTORE_TOPIC_REPLICATION_FACTOR: 1
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: backward
+
   broker:
     image: apache/kafka:4.2.2
     container_name: broker
