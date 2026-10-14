@@ -1,0 +1,12 @@
+{
+  "slot.name": "debezium_slot",
+  "plugin.name": "pgoutput",
+  "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+  "database.hostname": "terraform-c94db1584adb935d6d8f579ab8.cd8cmm6ks70a.ap-south-1.rds.amazonaws.com",
+  "database.port": "5432",
+  "database.user": "auction_app",
+  "database.password": "0QfIP:h$Pp8:w2[jtB1fk>jj!Q~d",
+  "database.dbname": "auction_db",
+  "topic.prefix": "file-upload",
+  "table.include.list": "public.image_blob_upload_attempts"
+}
