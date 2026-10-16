@@ -7,6 +7,10 @@
   "database.user": "auction_app",
   "database.password": "0QfIP:h$Pp8:w2[jtB1fk>jj!Q~d",
   "database.dbname": "auction_db",
-  "topic.prefix": "file-upload",
-  "table.include.list": "public.image_blob_upload_attempts"
+  "topic.prefix": "file_upload",
+  "table.include.list": "public.image_blob_upload_attempts",
+  "key.converter": "io.confluent.connect.protobuf.ProtobufConverter",
+  "value.converter": "io.confluent.connect.protobuf.ProtobufConverter",
+  "key.converter.schema.registry.url": "http://schema-registry:8081",
+  "value.converter.schema.registry.url": "http://schema-registry:8081"
 }
