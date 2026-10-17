@@ -557,6 +557,7 @@ type MultiPresignedUploadUrl struct {
 	MultiParts         []*MultiPresignedHTTPRequest `protobuf:"bytes,1,rep,name=multi_parts,json=multiParts" json:"multi_parts,omitempty"`
 	PartSize           *int64                       `protobuf:"varint,2,opt,name=part_size,json=partSize" json:"part_size,omitempty"`
 	MultipartAttemptId *int64                       `protobuf:"varint,3,opt,name=multipart_attempt_id,json=multipartAttemptId" json:"multipart_attempt_id,omitempty"`
+	UploadedEtags      []*PartEtag                  `protobuf:"bytes,4,rep,name=uploaded_etags,json=uploadedEtags" json:"uploaded_etags,omitempty"`
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -610,6 +611,13 @@ func (x *MultiPresignedUploadUrl) GetMultipartAttemptId() int64 {
 		return *x.MultipartAttemptId
 	}
 	return 0
+}
+
+func (x *MultiPresignedUploadUrl) GetUploadedEtags() []*PartEtag {
+	if x != nil {
+		return x.UploadedEtags
+	}
+	return nil
 }
 
 type SinglePresignedUploadUrl struct {
@@ -853,12 +861,13 @@ const file_lot_image_v1_lot_image_proto_rawDesc = "" +
 	"\x12PresignedUploadUrl\x12@\n" +
 	"\x06single\x18\x01 \x01(\v2&.lot_image.v1.SinglePresignedUploadUrlH\x00R\x06single\x12=\n" +
 	"\x05multi\x18\x02 \x01(\v2%.lot_image.v1.MultiPresignedUploadUrlH\x00R\x05multiB\x0f\n" +
-	"\rpresigned_url\"\xb2\x01\n" +
+	"\rpresigned_url\"\xf1\x01\n" +
 	"\x17MultiPresignedUploadUrl\x12H\n" +
 	"\vmulti_parts\x18\x01 \x03(\v2'.lot_image.v1.MultiPresignedHTTPRequestR\n" +
 	"multiParts\x12\x1b\n" +
 	"\tpart_size\x18\x02 \x01(\x03R\bpartSize\x120\n" +
-	"\x14multipart_attempt_id\x18\x03 \x01(\x03R\x12multipartAttemptId\"K\n" +
+	"\x14multipart_attempt_id\x18\x03 \x01(\x03R\x12multipartAttemptId\x12=\n" +
+	"\x0euploaded_etags\x18\x04 \x03(\v2\x16.lot_image.v1.PartEtagR\ruploadedEtags\"K\n" +
 	"\x18SinglePresignedUploadUrl\x12/\n" +
 	"\arequest\x18\x01 \x01(\v2\x15.lot_image.v1.RequestR\arequest\"`\n" +
 	"\x19MultiPresignedHTTPRequest\x12/\n" +
@@ -921,19 +930,20 @@ var file_lot_image_v1_lot_image_proto_depIdxs = []int32{
 	10, // 8: lot_image.v1.PresignedUploadUrl.single:type_name -> lot_image.v1.SinglePresignedUploadUrl
 	9,  // 9: lot_image.v1.PresignedUploadUrl.multi:type_name -> lot_image.v1.MultiPresignedUploadUrl
 	11, // 10: lot_image.v1.MultiPresignedUploadUrl.multi_parts:type_name -> lot_image.v1.MultiPresignedHTTPRequest
-	12, // 11: lot_image.v1.SinglePresignedUploadUrl.request:type_name -> lot_image.v1.Request
-	12, // 12: lot_image.v1.MultiPresignedHTTPRequest.request:type_name -> lot_image.v1.Request
-	14, // 13: lot_image.v1.Request.signed_header:type_name -> lot_image.v1.Request.SignedHeaderEntry
-	13, // 14: lot_image.v1.Request.SignedHeaderEntry.value:type_name -> lot_image.v1.HeaderValues
-	1,  // 15: lot_image.v1.LotImageService.GeneratePresignedUrl:input_type -> lot_image.v1.GeneratePresignedUrlRequest
-	3,  // 16: lot_image.v1.LotImageService.CompleteMultiPartUpload:input_type -> lot_image.v1.CompleteMultiPartUploadRequest
-	2,  // 17: lot_image.v1.LotImageService.GeneratePresignedUrl:output_type -> lot_image.v1.GeneratePresignedUrlResponse
-	5,  // 18: lot_image.v1.LotImageService.CompleteMultiPartUpload:output_type -> lot_image.v1.CompleteMultiPartUploadResponse
-	17, // [17:19] is the sub-list for method output_type
-	15, // [15:17] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	4,  // 11: lot_image.v1.MultiPresignedUploadUrl.uploaded_etags:type_name -> lot_image.v1.PartEtag
+	12, // 12: lot_image.v1.SinglePresignedUploadUrl.request:type_name -> lot_image.v1.Request
+	12, // 13: lot_image.v1.MultiPresignedHTTPRequest.request:type_name -> lot_image.v1.Request
+	14, // 14: lot_image.v1.Request.signed_header:type_name -> lot_image.v1.Request.SignedHeaderEntry
+	13, // 15: lot_image.v1.Request.SignedHeaderEntry.value:type_name -> lot_image.v1.HeaderValues
+	1,  // 16: lot_image.v1.LotImageService.GeneratePresignedUrl:input_type -> lot_image.v1.GeneratePresignedUrlRequest
+	3,  // 17: lot_image.v1.LotImageService.CompleteMultiPartUpload:input_type -> lot_image.v1.CompleteMultiPartUploadRequest
+	2,  // 18: lot_image.v1.LotImageService.GeneratePresignedUrl:output_type -> lot_image.v1.GeneratePresignedUrlResponse
+	5,  // 19: lot_image.v1.LotImageService.CompleteMultiPartUpload:output_type -> lot_image.v1.CompleteMultiPartUploadResponse
+	18, // [18:20] is the sub-list for method output_type
+	16, // [16:18] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_lot_image_v1_lot_image_proto_init() }

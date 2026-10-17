@@ -55,6 +55,11 @@ type uploadFile struct {
 	FileSize     uint
 }
 
+type imageEtag struct {
+	etag       string
+	partNumber int32
+}
+
 type multiPresignedRequest struct {
 	request *v4.PresignedHTTPRequest
 	part    int16
@@ -64,6 +69,7 @@ type multiPresignedUrl struct {
 	requests           []multiPresignedRequest
 	multipartAttemptId int64
 	partSize           int64
+	imageEtags         []imageEtag
 }
 
 type singlePresignedUrl struct {
@@ -357,7 +363,7 @@ func genrateUrlsForResumableUploads(ctx context.Context, resumableMultiUploads [
 	result := make([]presignedFileUrl, 0, len(resumableMultiUploads))
 	// todo add  concurrency in generateResumeUploadUrls-has network call inside "generateResumeUploadUrls"
 	for _, upload := range resumableMultiUploads {
-		resumeMultiParts, err := s3Storage.generateResumeUploadUrls(ctx, uploadIdentity{storageKey: upload.storageKey, uploadId: upload.uploadId}, upload.fileParts)
+		resumeMultiParts, imageEtags, err := s3Storage.generateResumeUploadUrls(ctx, uploadIdentity{storageKey: upload.storageKey, uploadId: upload.uploadId}, upload.fileParts)
 		if err != nil {
 			return nil, err
 		}
@@ -367,6 +373,7 @@ func genrateUrlsForResumableUploads(ctx context.Context, resumableMultiUploads [
 			presignedUploadUrl: presignedUploadUrl{Multi: multiPresignedUrl{
 				requests: resumeMultiParts,
 				partSize: upload.partSize, multipartAttemptId: upload.multipartAttemptId,
+				imageEtags: imageEtags,
 			}},
 		})
 	}
@@ -447,20 +454,20 @@ func (s3Storage s3Storage) generateNewMultiPartUploadUrls(ctx context.Context, u
 
 func (s3Storage s3Storage) generateResumeUploadUrls(ctx context.Context, uploadIdentity uploadIdentity,
 	allParts []int16,
-) ([]multiPresignedRequest, error) {
-	nonUploadedParts, err := s3Storage.listNotUploadedParts(ctx, uploadIdentity, allParts)
+) ([]multiPresignedRequest, []imageEtag, error) {
+	nonUploadedParts, uploadedEtags, err := s3Storage.listNotUploadedParts(ctx, uploadIdentity, allParts)
 	if err != nil {
 		fmt.Println(err)
-		return nil, err
+		return nil, nil, err
 	}
 
 	resumeMultiParts, err := s3Storage.generateExistingMultiPartPresignedUrl(ctx, uploadIdentity, nonUploadedParts)
 	if err != nil {
 		fmt.Println(err)
-		return nil, err
+		return nil, nil, err
 	}
 
-	return resumeMultiParts, nil
+	return resumeMultiParts, uploadedEtags, nil
 }
 
 func (s3Storage s3Storage) generateExistingMultiPartPresignedUrl(ctx context.Context, uploadIdentity uploadIdentity,
@@ -471,7 +478,8 @@ func (s3Storage s3Storage) generateExistingMultiPartPresignedUrl(ctx context.Con
 	for _, part := range nonUploadedParts {
 		presignedUploadPartUrl, err := s3Storage.Presigner.PresignUploadPart(ctx, &s3.UploadPartInput{
 			Bucket: &s3Storage.bucketName,
-			Key:    &uploadIdentity.storageKey, PartNumber: aws.Int32(int32(part)), UploadId: &uploadIdentity.uploadId,
+			// todo type is going from int16 to int32,fix it
+			Key: &uploadIdentity.storageKey, PartNumber: aws.Int32(int32(part)), UploadId: &uploadIdentity.uploadId,
 		}, s3.WithPresignExpires(presignExpiry))
 		if err != nil {
 			fmt.Println(err)
@@ -484,20 +492,28 @@ func (s3Storage s3Storage) generateExistingMultiPartPresignedUrl(ctx context.Con
 	return multiparts, nil
 }
 
-func (s3Storage s3Storage) listNotUploadedParts(ctx context.Context, uploadIdentity uploadIdentity, allParts []int16) ([]int16, error) {
+func (s3Storage s3Storage) listNotUploadedParts(ctx context.Context, uploadIdentity uploadIdentity, allParts []int16) ([]int16, []imageEtag, error) {
 	partOutput, err := s3Storage.s3Client.ListParts(ctx, &s3.ListPartsInput{
 		Bucket:   &s3Storage.bucketName,
 		Key:      &uploadIdentity.storageKey,
 		UploadId: &uploadIdentity.uploadId,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	alreadyUploadedParts := partOutput.Parts
+
 	uploadedPartsMap := make(map[int16]struct{}, len(alreadyUploadedParts))
+	uploadedPartsEtag := make([]imageEtag, 0, len(alreadyUploadedParts))
 
 	for _, p := range alreadyUploadedParts {
+
+		uploadedEtag := imageEtag{
+			etag:       *p.ETag,
+			partNumber: *p.PartNumber,
+		}
+		uploadedPartsEtag = append(uploadedPartsEtag, uploadedEtag)
 		uploadedPartsMap[int16(*p.PartNumber)] = struct{}{}
 	}
 
@@ -509,7 +525,7 @@ func (s3Storage s3Storage) listNotUploadedParts(ctx context.Context, uploadIdent
 		}
 	}
 
-	return missingParts, nil
+	return missingParts, uploadedPartsEtag, nil
 }
 
 type duplicateFile = uploadFile

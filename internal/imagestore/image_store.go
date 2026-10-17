@@ -119,6 +119,7 @@ func convertToPresignedFile(presignedUrl presignedFileUrl) (*lotimage.PresignedF
 				MultiParts:         convertToLotImageMultiPartPresignedHttpRequest(presignedUploadUrl.Multi),
 				MultipartAttemptId: &presignedUploadUrl.Multi.multipartAttemptId,
 				PartSize:           &presignedUrl.Multi.partSize,
+				UploadedEtags:      convertToUploadedEtags(presignedUploadUrl.Multi.imageEtags),
 			},
 		}
 		presignedImageUploadUrl = &lotimage.PresignedUploadUrl{
@@ -130,6 +131,17 @@ func convertToPresignedFile(presignedUrl presignedFileUrl) (*lotimage.PresignedF
 		UploadFile:         imageFile,
 		PresignedUploadUrl: presignedImageUploadUrl,
 	}, nil
+}
+
+func convertToUploadedEtags(imageTags []imageEtag) []*lotimage.PartEtag {
+	uploadedEtags := make([]*lotimage.PartEtag, 0, len(imageTags))
+	for _, tag := range imageTags {
+		uploadedEtags = append(uploadedEtags, &lotimage.PartEtag{
+			Etag: &tag.etag,
+			Part: &tag.partNumber,
+		})
+	}
+	return uploadedEtags
 }
 
 func convertToLotImageMultiPresignedHttpRequest(multiPresignedRequest multiPresignedRequest) *lotimage.MultiPresignedHTTPRequest {
