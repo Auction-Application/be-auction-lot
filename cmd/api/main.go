@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"net"
 
+	"buf.build/go/protovalidate"
 	"github.com/Auction-Application/be-auction-item/internal/database"
 	"github.com/Auction-Application/be-auction-item/internal/imagestore"
 	"github.com/Auction-Application/be-auction-item/internal/server"
+	"github.com/Auction-Application/be-auction-item/internal/valid"
 	lotPb "github.com/Auction-Application/be-auction-item/rpc/gen/lot/v1"
 	lotimage "github.com/Auction-Application/be-auction-item/rpc/gen/lot_image/v1"
 	"github.com/joho/godotenv"
@@ -52,7 +54,16 @@ func Run(port int, rpc Rpc) error {
 
 	defer listener.Close()
 
-	grpcServer := grpc.NewServer()
+	protoValidate, err := protovalidate.New()
+	if err != nil {
+		fmt.Println("failed to create protovalidate validators")
+	}
+
+	opts := []grpc.ServerOption{
+		grpc.UnaryInterceptor(valid.Validate(protoValidate)),
+	}
+
+	grpcServer := grpc.NewServer(opts...)
 	lotPb.RegisterLotServiceServer(grpcServer, rpc.lotServer)
 	lotimage.RegisterLotImageServiceServer(grpcServer, rpc.imageStore)
 

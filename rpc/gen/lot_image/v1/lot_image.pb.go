@@ -23,11 +23,12 @@ const (
 )
 
 type ImageFile struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Sha256        *string                `protobuf:"bytes,1,opt,name=sha256" json:"sha256,omitempty"`
-	FileName      *string                `protobuf:"bytes,2,opt,name=file_name,json=fileName" json:"file_name,omitempty"`
-	ClientFileId  *int32                 `protobuf:"varint,3,opt,name=client_file_id,json=clientFileId" json:"client_file_id,omitempty"`
-	FileSize      *uint64                `protobuf:"varint,4,opt,name=file_size,json=fileSize" json:"file_size,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Sha256   *string                `protobuf:"bytes,1,opt,name=sha256" json:"sha256,omitempty"`
+	FileName *string                `protobuf:"bytes,2,opt,name=file_name,json=fileName" json:"file_name,omitempty"`
+	// todo remove client_file_id later
+	ClientFileId  *int32  `protobuf:"varint,3,opt,name=client_file_id,json=clientFileId" json:"client_file_id,omitempty"`
+	FileSize      *uint64 `protobuf:"varint,4,opt,name=file_size,json=fileSize" json:"file_size,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -91,9 +92,10 @@ func (x *ImageFile) GetFileSize() uint64 {
 }
 
 type GeneratePresignedUrlRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	LotImages     []*ImageFile           `protobuf:"bytes,1,rep,name=lot_images,json=lotImages" json:"lot_images,omitempty"`
-	LotId         *string                `protobuf:"bytes,2,opt,name=lot_id,json=lotId" json:"lot_id,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	LotImages []*ImageFile           `protobuf:"bytes,1,rep,name=lot_images,json=lotImages" json:"lot_images,omitempty"`
+	// todo change lot_id to number, not uuid later
+	LotId         *string `protobuf:"bytes,2,opt,name=lot_id,json=lotId" json:"lot_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -255,9 +257,10 @@ func (x *CompleteMultiPartUploadRequest) GetPartEtags() []*PartEtag {
 }
 
 type PartEtag struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Etag          *string                `protobuf:"bytes,1,opt,name=etag" json:"etag,omitempty"`
-	Part          *int32                 `protobuf:"varint,2,opt,name=part" json:"part,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	Etag  *string                `protobuf:"bytes,1,opt,name=etag" json:"etag,omitempty"`
+	// todo uint32 protobuf,  0 to 65535 uint16 in golang
+	Part          *uint32 `protobuf:"varint,2,opt,name=part" json:"part,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -299,7 +302,7 @@ func (x *PartEtag) GetEtag() string {
 	return ""
 }
 
-func (x *PartEtag) GetPart() int32 {
+func (x *PartEtag) GetPart() uint32 {
 	if x != nil && x.Part != nil {
 		return *x.Part
 	}
@@ -824,14 +827,13 @@ var File_lot_image_v1_lot_image_proto protoreflect.FileDescriptor
 
 const file_lot_image_v1_lot_image_proto_rawDesc = "" +
 	"\n" +
-	"\x1clot_image/v1/lot_image.proto\x12\flot_image.v1\x1a\x1bbuf/validate/validate.proto\"\x9b\x01\n" +
-	"\tImageFile\x12\"\n" +
-	"\x06sha256\x18\x01 \x01(\tB\n" +
-	"\xbaH\a\xc8\x01\x01r\x02\x10@R\x06sha256\x12'\n" +
-	"\tfile_name\x18\x02 \x01(\tB\n" +
-	"\xbaH\a\xc8\x01\x01r\x02\x10\x03R\bfileName\x12$\n" +
-	"\x0eclient_file_id\x18\x03 \x01(\x05R\fclientFileId\x12\x1b\n" +
-	"\tfile_size\x18\x04 \x01(\x04R\bfileSize\"l\n" +
+	"\x1clot_image/v1/lot_image.proto\x12\flot_image.v1\x1a\x1bbuf/validate/validate.proto\"\xac\x01\n" +
+	"\tImageFile\x12#\n" +
+	"\x06sha256\x18\x01 \x01(\tB\v\xbaH\b\xc8\x01\x01r\x03\x98\x01@R\x06sha256\x12*\n" +
+	"\tfile_name\x18\x02 \x01(\tB\r\xbaH\n" +
+	"\xc8\x01\x01r\x05\x10\x03\x18\xfa\x01R\bfileName\x12$\n" +
+	"\x0eclient_file_id\x18\x03 \x01(\x05R\fclientFileId\x12(\n" +
+	"\tfile_size\x18\x04 \x01(\x04B\v\xbaH\b2\x06\x18\x80\x80\x80\x80\x18R\bfileSize\"l\n" +
 	"\x1bGeneratePresignedUrlRequest\x126\n" +
 	"\n" +
 	"lot_images\x18\x01 \x03(\v2\x17.lot_image.v1.ImageFileR\tlotImages\x12\x15\n" +
@@ -843,10 +845,11 @@ const file_lot_image_v1_lot_image_proto_rawDesc = "" +
 	"\x1eCompleteMultiPartUploadRequest\x120\n" +
 	"\x14multipart_attempt_id\x18\x01 \x01(\x03R\x12multipartAttemptId\x125\n" +
 	"\n" +
-	"part_etags\x18\x02 \x03(\v2\x16.lot_image.v1.PartEtagR\tpartEtags\"2\n" +
+	"part_etags\x18\x02 \x03(\v2\x16.lot_image.v1.PartEtagR\tpartEtags\">\n" +
 	"\bPartEtag\x12\x12\n" +
-	"\x04etag\x18\x01 \x01(\tR\x04etag\x12\x12\n" +
-	"\x04part\x18\x02 \x01(\x05R\x04part\"U\n" +
+	"\x04etag\x18\x01 \x01(\tR\x04etag\x12\x1e\n" +
+	"\x04part\x18\x02 \x01(\rB\n" +
+	"\xbaH\a*\x05\x18\x90N(\x01R\x04part\"U\n" +
 	"\x1fCompleteMultiPartUploadResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x18\n" +
 	"\amessage\x18\x02 \x01(\tR\amessage\"\xea\x01\n" +

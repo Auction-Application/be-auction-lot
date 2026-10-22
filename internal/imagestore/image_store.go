@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/proto"
 )
 
 type ImageStore struct {
@@ -30,8 +29,8 @@ func (imageStore *ImageStore) CompleteMultiPartUpload(ctx context.Context, compl
 	}
 
 	return &lotimage.CompleteMultiPartUploadResponse{
-		Success: proto.Bool(true),
-		Message: proto.String("Upload Completed"),
+		Success: new(true),
+		Message: new("Upload Completed"),
 	}, nil
 }
 
@@ -40,7 +39,7 @@ func convertToCompletedPart(wireFormatEtagParts []*lotimage.PartEtag) []types.Co
 	for _, etagPart := range wireFormatEtagParts {
 		etagParts = append(etagParts, types.CompletedPart{
 			ETag:       etagPart.Etag,
-			PartNumber: etagPart.Part,
+			PartNumber: new(int32(*etagPart.Part)),
 		})
 	}
 
@@ -138,7 +137,7 @@ func convertToUploadedEtags(imageTags []imageEtag) []*lotimage.PartEtag {
 	for _, tag := range imageTags {
 		uploadedEtags = append(uploadedEtags, &lotimage.PartEtag{
 			Etag: &tag.etag,
-			Part: &tag.partNumber,
+			Part: new(uint32(tag.partNumber)),
 		})
 	}
 	return uploadedEtags
@@ -154,11 +153,11 @@ func convertToLotImageMultiPresignedHttpRequest(multiPresignedRequest multiPresi
 
 	presignRequest := &lotimage.MultiPresignedHTTPRequest{
 		Request: &lotimage.Request{
-			Url:          proto.String(multiPresignedRequest.request.URL),
-			Method:       proto.String(multiPresignedRequest.request.Method),
+			Url:          new(multiPresignedRequest.request.URL),
+			Method:       new(multiPresignedRequest.request.Method),
 			SignedHeader: signedHeader,
 		},
-		Part: proto.Int32(int32(multiPresignedRequest.part)),
+		Part: new(int32(multiPresignedRequest.part)),
 	}
 	return presignRequest
 }
@@ -172,8 +171,8 @@ func convertToLotImageSinglePresignedHttpRequest(presignedRequest *v4.PresignedH
 	}
 
 	presignRequest := &lotimage.Request{
-		Url:          proto.String(presignedRequest.URL),
-		Method:       proto.String(presignedRequest.Method),
+		Url:          new(presignedRequest.URL),
+		Method:       new(presignedRequest.Method),
 		SignedHeader: signedHeader,
 	}
 

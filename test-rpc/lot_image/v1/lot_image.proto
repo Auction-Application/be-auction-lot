@@ -1,0 +1,101 @@
+edition = "2023";
+
+package lot_image.v1;
+
+import "buf/validate/validate.proto";
+
+option go_package = ".;lotimage";
+
+message ImageFile {
+  string sha256 = 1 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.len = 64
+  ];
+  string file_name = 2 [
+    (buf.validate.field).required = true,
+    (buf.validate.field).string.min_len = 3,
+    (buf.validate.field).string.max_len = 250
+  ];
+  //  todo remove client_file_id later
+  int32 client_file_id = 3;
+  uint64 file_size = 4 [(buf.validate.field).uint64.lte = 6442450944];
+}
+
+message GeneratePresignedUrlRequest {
+  repeated ImageFile lot_images = 1;
+  // todo change lot_id to number, not uuid later
+  string lot_id = 2;
+}
+
+service LotImageService {
+  rpc GeneratePresignedUrl(GeneratePresignedUrlRequest) returns (GeneratePresignedUrlResponse);
+  rpc CompleteMultiPartUpload(CompleteMultiPartUploadRequest) returns (CompleteMultiPartUploadResponse);
+}
+
+message GeneratePresignedUrlResponse {
+  bool success = 1;
+  string message = 2;
+  PresignFileResult presign_result = 3;
+}
+message CompleteMultiPartUploadRequest {
+  int64 multipart_attempt_id = 1;
+  repeated PartEtag part_etags = 2;
+}
+
+message PartEtag {
+  string etag = 1;
+  // todo uint32 protobuf,  0 to 65535 uint16 in golang
+  uint32 part = 2 [(buf.validate.field).uint32 = {
+    gte: 1
+    lte: 10000
+  }];
+}
+
+message CompleteMultiPartUploadResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message PresignFileResult {
+  repeated ImageFile duplicate_files = 1;
+  repeated ImageFile already_uploaded_files = 2;
+  repeated PresignedFile presigned_files = 3;
+}
+
+message PresignedFile {
+  ImageFile upload_file = 1;
+  PresignedUploadUrl presigned_upload_url = 2;
+}
+
+message PresignedUploadUrl {
+  oneof presigned_url {
+    SinglePresignedUploadUrl single = 1;
+    MultiPresignedUploadUrl multi = 2;
+  }
+}
+
+message MultiPresignedUploadUrl {
+  repeated MultiPresignedHTTPRequest multi_parts = 1;
+  int64 part_size = 2;
+  int64 multipart_attempt_id = 3;
+  repeated PartEtag uploaded_etags = 4;
+}
+
+message SinglePresignedUploadUrl {
+  Request request = 1;
+}
+
+message MultiPresignedHTTPRequest {
+  Request request = 1;
+  int32 part = 2;
+}
+
+message Request {
+  string url = 1;
+  string method = 2;
+  map<string, HeaderValues> signed_header = 3;
+}
+
+message HeaderValues {
+  repeated string values = 1;
+}
