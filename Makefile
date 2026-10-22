@@ -11,6 +11,18 @@ run/api:
 auto-run/api:
 	air
 
+# ==================================================================================== #
+# DATABASE MIGRATIONS
+# ==================================================================================== #
+.PHONY:migrate/db
+migrate/db:
+	migrate -path ./internal/database/migrations -database $(DATABASE_URL) up	
+
+
+.PHONY:migrate/create
+migrate/create:
+	migrate create -seq -ext sql  -dir ./internal/database/migrations $(FILE_NAME)	
+
 
 # ==================================================================================== #
 # QUALITY CONTROL
