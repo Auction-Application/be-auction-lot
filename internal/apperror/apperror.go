@@ -49,13 +49,13 @@ func InvalidArgumentError(op Operation, fields []FieldError, err error) AppError
 		Op:     op,
 		Code:   ClientCodeInvalidArgument,
 		Fields: fields,
-		Err:    fmt.Errorf("Invalid Arguments are: %s, error is: %w", strings.Join(errorSlice, "\n"), err),
+		Err:    fmt.Errorf("invalid arguments are: %s, error is: %w", strings.Join(errorSlice, "\n"), err),
 	}
 }
 
 func InternalServerError(op Operation, err error, message string) AppError {
 	return AppError{
-		Op:  "unknown",
+		Op:  op,
 		Err: fmt.Errorf("%s:%w,", message, err),
 	}
 }

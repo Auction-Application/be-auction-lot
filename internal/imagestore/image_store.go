@@ -47,7 +47,7 @@ func convertToCompletedPart(wireFormatEtagParts []*lotimage.PartEtag) []types.Co
 }
 
 func (imageStore *ImageStore) GeneratePresignedUrl(ctx context.Context, presignRequest *lotimage.GeneratePresignedUrlRequest) (*lotimage.GeneratePresignedUrlResponse, error) {
-	uploadfileRequestResult, err := imageStore.initiateUpload(convertToUploadFiles(presignRequest.LotImages), *presignRequest.LotId)
+	uploadfileRequestResult, err := imageStore.initiateUpload(ctx, convertToUploadFiles(presignRequest.LotImages), *presignRequest.LotId)
 	if err != nil {
 		return nil, err
 	}

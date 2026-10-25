@@ -3,6 +3,7 @@ package valid
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"buf.build/go/protovalidate"
 	"github.com/Auction-Application/be-auction-item/internal/apperror"
@@ -82,7 +83,7 @@ func convertToGRPCErr(err apperror.AppError) error {
 	translationFn, ok := appErrToGRPCTranslation[err.Code]
 
 	if !ok {
-		return apperror.InternalServerError(op, err, "grpcTranalation failed")
+		return apperror.InternalServerError(op, err, "grpcTranslation failed")
 	}
 	return translationFn(err)
 }
@@ -137,6 +138,8 @@ func toGRPCError(err error) error {
 	}
 
 	appError := prioritySearchErrorCode(err)
+	// todo add logging
+	fmt.Println(appError)
 	return convertToGRPCErr(appError)
 }
 
