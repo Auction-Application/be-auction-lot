@@ -53,6 +53,19 @@ func InvalidArgumentError(op Operation, fields []FieldError, err error) AppError
 	}
 }
 
+func PreconditionFailedError(op Operation, fields []FieldError, err error) AppError {
+	errorSlice := make([]string, 0, len(fields))
+	for _, f := range fields {
+		errorSlice = append(errorSlice, f.getMessage())
+	}
+	return AppError{
+		Op:     op,
+		Code:   ClientCodeStorageConflict,
+		Fields: fields,
+		Err:    fmt.Errorf("failed preconditions are: %s, error is: %w", strings.Join(errorSlice, "\n"), err),
+	}
+}
+
 func InternalServerError(op Operation, err error, message string) AppError {
 	return AppError{
 		Op:  op,

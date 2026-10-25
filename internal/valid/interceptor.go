@@ -64,17 +64,34 @@ func codeInvalidArgumentTranslation(err apperror.AppError) error {
 	return st.Err()
 }
 
+func clientCodeStorageConflictTranslation(err apperror.AppError) error {
+	preCond := &errdetails.PreconditionFailure{}
+	for _, viol := range err.Fields {
+		preCond.Violations = append(preCond.Violations, &errdetails.PreconditionFailure_Violation{
+			Subject:     viol.Field,
+			Description: viol.Description,
+		})
+	}
+
+	st, detailsErr := status.New(codes.FailedPrecondition, "precondition failed").WithDetails(preCond)
+	if detailsErr != nil {
+		return status.Error(codes.Internal, "precondition failed and internal error")
+	}
+
+	return st.Err()
+}
+
 func codeInternalServerErrorTranslation(err apperror.AppError) error {
 	return status.Error(codes.Internal, "internal server error")
 }
 
-func noOpTranslation(err apperror.AppError) error {
-	return nil
-}
+// func noOpTranslation(err apperror.AppError) error {
+// 	return nil
+// }
 
 var appErrToGRPCTranslation = map[apperror.ErrCode]func(err apperror.AppError) error{
 	apperror.ClientCodeInvalidArgument: codeInvalidArgumentTranslation,
-	apperror.ClientCodeStorageConflict: noOpTranslation,
+	apperror.ClientCodeStorageConflict: clientCodeStorageConflictTranslation,
 	apperror.CodeInternalServerError:   codeInternalServerErrorTranslation,
 }
 
@@ -83,7 +100,7 @@ func convertToGRPCErr(err apperror.AppError) error {
 	translationFn, ok := appErrToGRPCTranslation[err.Code]
 
 	if !ok {
-		return apperror.InternalServerError(op, err, "grpcTranslation failed")
+		return codeInternalServerErrorTranslation(apperror.InternalServerError(op, err, "grpcTranslation failed"))
 	}
 	return translationFn(err)
 }
@@ -98,12 +115,14 @@ func searchCode(code apperror.ErrCode, err error) (apperror.AppError, bool) {
 
 	switch t := err.(type) {
 	case interface{ Unwrap() error }:
-		return searchCode(code, err)
+		return searchCode(code, t.Unwrap())
 
 	case interface{ Unwrap() []error }:
 
 		for _, e := range t.Unwrap() {
-			return searchCode(code, e)
+			if found, ok := searchCode(code, e); ok {
+				return found, ok
+			}
 		}
 
 	}

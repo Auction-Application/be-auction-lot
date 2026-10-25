@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Auction-Application/be-auction-item/internal/apperror"
+	"github.com/Auction-Application/be-auction-item/internal/database"
 	"github.com/Auction-Application/be-auction-item/internal/database/filestore"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
@@ -127,6 +128,7 @@ func (s3Storage s3Storage) generateS3UploadUrl(ctx context.Context, files []uplo
 func (s3Storage s3Storage) createMultipartPresignedFileUrl(ctx context.Context,
 	lotId uuid.UUID, query *filestore.Queries, multipartFileData multipartFileData,
 ) ([]presignedFileUrl, error) {
+	const operation apperror.Operation = "imagestore.createMultipartPresignedFileUrl"
 	multipartPresignedFileUrls := make([]presignedFileUrl, 0)
 
 	multiUploadResult, err := query.InsertAndValidateMultiPartUpload(
@@ -143,7 +145,11 @@ func (s3Storage s3Storage) createMultipartPresignedFileUrl(ctx context.Context,
 			UploadIds:    multipartFileData.multipartFileUploadIds,
 		})
 	if err != nil {
-		return nil, err
+		errFields, ok := database.DeriveIfStorageErrorMessage(err)
+		if !ok {
+			return nil, err
+		}
+		return nil, apperror.PreconditionFailedError(operation, convertToFieldErr(errFields), err)
 	}
 
 	newMultiUploads, resumableMultiUploads := segregateMultiUploadFiles(multiUploadResult)
@@ -606,8 +612,8 @@ func (imageStore *ImageStore) initiateUpload(ctx context.Context, fileToUpload [
 	if err != nil {
 		return uploadFileRequestResult{}, apperror.InvalidArgumentError(operation, []apperror.FieldError{
 			{
-				Field:       "uuid",
-				Description: "uuid could not be parsed",
+				Field:       "lotId",
+				Description: "lotId could not be parsed as uuid",
 			},
 		},
 			err)
