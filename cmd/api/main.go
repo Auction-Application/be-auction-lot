@@ -60,7 +60,7 @@ func Run(port int, rpc Rpc) error {
 	}
 
 	opts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(valid.Validate(protoValidate)),
+		grpc.ChainUnaryInterceptor(valid.Validate(protoValidate), valid.ErrorResponseInterceptor()),
 	}
 
 	grpcServer := grpc.NewServer(opts...)

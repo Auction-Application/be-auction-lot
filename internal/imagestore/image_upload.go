@@ -10,6 +10,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/Auction-Application/be-auction-item/internal/apperror"
 	"github.com/Auction-Application/be-auction-item/internal/database/filestore"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
@@ -600,10 +601,17 @@ type uploadFileRequestResult struct {
 }
 
 func (imageStore *ImageStore) initiateUpload(fileToUpload []uploadFile, lotId string) (uploadFileRequestResult, error) {
+	const operation apperror.Operation = "imageStore.initiateUpload"
 	files, duplicateFiles := intentBatchUpload(fileToUpload)
 	lotIdUUID, err := uuid.Parse(lotId)
 	if err != nil {
-		return uploadFileRequestResult{}, err
+		return uploadFileRequestResult{}, apperror.InvalidArgumentError(operation, []apperror.FieldError{
+			{
+				Field:       "uuid",
+				Description: "uuid could not be parsed",
+			},
+		},
+			err)
 	}
 	fmt.Println(duplicateFiles)
 	tx, err := imageStore.conn.Begin(context.TODO())
