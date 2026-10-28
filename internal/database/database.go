@@ -39,11 +39,21 @@ type StorageField struct {
 	Description string
 }
 
-var foreignKeyConstraint = foreignKeyViolationMessage{
+// todo remove image_blobs table
+// todo lot_images is a separate verified true table.
+// todo tabel lots need a revamp
+var databaseConstraint = foreignKeyViolationMessage{
 	"image_blob_upload_attempts_lot_id_fkey": []StorageField{
 		{
 			Subject:     "Storage",
 			Description: "lotId does not match",
+		},
+	},
+	// todo make uniq index verfied column, not upload_state column
+	"idx_unq_img_attmpts_sha256_lot_id_upload_state": []StorageField{
+		{
+			Subject:     "Storage",
+			Description: "file with same sha256 and lotId whose upload has not been completed already exists",
 		},
 	},
 }
@@ -71,5 +81,5 @@ func DeriveIfStorageErrorMessage(err error) ([]StorageField, bool) {
 		return nil, false
 	}
 
-	return foreignKeyConstraint.getErrorMessage(ForeignKeyName(pgError.ConstraintName))
+	return databaseConstraint.getErrorMessage(ForeignKeyName(pgError.ConstraintName))
 }

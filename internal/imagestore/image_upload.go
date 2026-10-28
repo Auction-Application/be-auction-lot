@@ -116,7 +116,16 @@ func (s3Storage s3Storage) generateS3UploadUrl(ctx context.Context, files []uplo
 		multipartPresignedFileUrls, err := s3Storage.createMultipartPresignedFileUrl(ctx,
 			lotId, query, extractData.multipartFile)
 		if err != nil {
-			return nil, err
+			return nil, apperror.InvalidArgumentError("test", apperror.ErrDetails{
+				Fields: []apperror.FieldError{
+					{
+						Field:       "test",
+						Description: "err",
+					},
+				},
+				Message: "testing xa",
+			},
+				err).Merge()
 		}
 
 		fileUploads = append(fileUploads, multipartPresignedFileUrls...)
@@ -149,7 +158,11 @@ func (s3Storage s3Storage) createMultipartPresignedFileUrl(ctx context.Context,
 		if !ok {
 			return nil, err
 		}
-		return nil, apperror.PreconditionFailedError(operation, convertToFieldErr(errFields), err)
+		abcd := apperror.PreconditionFailedError(operation, apperror.ErrDetails{
+			Fields:  convertToFieldErr(errFields),
+			Message: "unknown lotId",
+		}, err)
+		return nil, &abcd
 	}
 
 	newMultiUploads, resumableMultiUploads := segregateMultiUploadFiles(multiUploadResult)
@@ -610,11 +623,21 @@ func (imageStore *ImageStore) initiateUpload(ctx context.Context, fileToUpload [
 	files, duplicateFiles := intentBatchUpload(fileToUpload)
 	lotIdUUID, err := uuid.Parse(lotId)
 	if err != nil {
-		return uploadFileRequestResult{}, apperror.InvalidArgumentError(operation, []apperror.FieldError{
-			{
-				Field:       "lotId",
-				Description: "lotId could not be parsed as uuid",
+		// return uploadFileRequestResult{}, fmt.Errorf("the error is %w and custom error is %w", err, apperror.InvalidArgumentError(operation, []apperror.FieldError{
+		// 	{
+		// 		Field:       "lotId",
+		// 		Description: "lotId could not be parsed as uuid",
+		// 	},
+		// },
+		// 	err))
+		return uploadFileRequestResult{}, apperror.InvalidArgumentError(operation, apperror.ErrDetails{
+			Fields: []apperror.FieldError{
+				{
+					Field:       "lotId",
+					Description: "lotId could not be parsed as uuid",
+				},
 			},
+			Message: "unknown lotId",
 		},
 			err)
 	}

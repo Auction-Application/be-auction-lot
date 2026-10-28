@@ -47,7 +47,7 @@ func Validate(v protovalidate.Validator) grpc.UnaryServerInterceptor {
 	}
 }
 
-func codeInvalidArgumentTranslation(err apperror.AppError) error {
+func clientCodeInvalidArgumentTranslation(err apperror.AppError) error {
 	br := &errdetails.BadRequest{}
 	for _, viol := range err.Fields {
 		br.FieldViolations = append(br.FieldViolations, &errdetails.BadRequest_FieldViolation{
@@ -56,7 +56,7 @@ func codeInvalidArgumentTranslation(err apperror.AppError) error {
 		})
 	}
 
-	st, detailsErr := status.New(codes.InvalidArgument, "invalid request").WithDetails(br)
+	st, detailsErr := status.New(codes.InvalidArgument, err.Message).WithDetails(br)
 	if detailsErr != nil {
 		return status.Error(codes.Internal, "invalid request and internal error")
 	}
@@ -73,7 +73,8 @@ func clientCodeStorageConflictTranslation(err apperror.AppError) error {
 		})
 	}
 
-	st, detailsErr := status.New(codes.FailedPrecondition, "precondition failed").WithDetails(preCond)
+	// todo make message dynamic
+	st, detailsErr := status.New(codes.FailedPrecondition, err.Message).WithDetails(preCond)
 	if detailsErr != nil {
 		return status.Error(codes.Internal, "precondition failed and internal error")
 	}
@@ -85,14 +86,15 @@ func codeInternalServerErrorTranslation(err apperror.AppError) error {
 	return status.Error(codes.Internal, "internal server error")
 }
 
-// func noOpTranslation(err apperror.AppError) error {
-// 	return nil
-// }
+func codeUnknownErrTranslation(err apperror.AppError) error {
+	return status.Error(codes.Unknown, "unknown error")
+}
 
 var appErrToGRPCTranslation = map[apperror.ErrCode]func(err apperror.AppError) error{
-	apperror.ClientCodeInvalidArgument: codeInvalidArgumentTranslation,
+	apperror.ClientCodeInvalidArgument: clientCodeInvalidArgumentTranslation,
 	apperror.ClientCodeStorageConflict: clientCodeStorageConflictTranslation,
 	apperror.CodeInternalServerError:   codeInternalServerErrorTranslation,
+	apperror.CodeUnknownError:          codeUnknownErrTranslation,
 }
 
 func convertToGRPCErr(err apperror.AppError) error {
@@ -100,7 +102,7 @@ func convertToGRPCErr(err apperror.AppError) error {
 	translationFn, ok := appErrToGRPCTranslation[err.Code]
 
 	if !ok {
-		return codeInternalServerErrorTranslation(apperror.InternalServerError(op, err, "grpcTranslation failed"))
+		return codeInternalServerErrorTranslation(apperror.InternalServerError(op, err, "grpcTranslation code failed"))
 	}
 	return translationFn(err)
 }
@@ -108,9 +110,23 @@ func convertToGRPCErr(err apperror.AppError) error {
 // priority is from left to right, left most has higher priority and right most and so on.
 var priorityClientDisplayErrCodes []apperror.ErrCode = []apperror.ErrCode{apperror.ClientCodeInvalidArgument, apperror.ClientCodeStorageConflict}
 
-func searchCode(code apperror.ErrCode, err error) (apperror.AppError, bool) {
-	if appErrType, ok := err.(apperror.AppError); ok && appErrType.Code == code {
-		return appErrType, true
+func searchCode(code apperror.ErrCode, err error) (apperror.AppError, bool, bool) {
+	detailedErr, ok := err.(apperror.DetailedError)
+	if ok {
+		if detailedErr.GiveErr().GetPriorityErr() {
+			if detailedErr.GiveErr().Code == code {
+				// todo make function
+				if !detailedErr.GiveErr().GetMergeStatus() {
+					return detailedErr.GiveErr(), false, true
+				}
+				return detailedErr.GiveErr(), true, true
+			}
+		}
+		// todo make function
+		if !detailedErr.GiveErr().GetMergeStatus() {
+			return detailedErr.GiveErr(), false, true
+		}
+		return detailedErr.GiveErr(), true, true
 	}
 
 	switch t := err.(type) {
@@ -120,24 +136,40 @@ func searchCode(code apperror.ErrCode, err error) (apperror.AppError, bool) {
 	case interface{ Unwrap() []error }:
 
 		for _, e := range t.Unwrap() {
-			if found, ok := searchCode(code, e); ok {
-				return found, ok
+			if foundErr, mergeStatus, found := searchCode(code, e); found {
+				return foundErr, mergeStatus, found
 			}
 		}
 
 	}
 
-	return apperror.AppError{}, false
+	return apperror.AppError{}, false, false
 }
 
 func prioritySearchErrorCode(err error) apperror.AppError {
+	var errCollection []apperror.AppError
 	for _, code := range priorityClientDisplayErrCodes {
-		appErr, ok := searchCode(code, err)
+		appErr, mergeStatus, ok := searchCode(code, err)
 		if ok {
-			return appErr
+			if !mergeStatus && len(errCollection) < 1 {
+				return appErr
+			}
+			errCollection = append(errCollection, appErr)
 		}
+
 	}
-	return apperror.CatchAllInternalServerError(err)
+	if len(errCollection) > 0 {
+		mergeAppErr := apperror.AppError{Code: errCollection[0].Code, Err: err, Message: errCollection[0].Message}
+		for i, e := range errCollection {
+			mergeAppErr.Fields = append(mergeAppErr.Fields, e.Fields...)
+			if i > 0 {
+				mergeAppErr.Message = mergeAppErr.Message + ";" + e.Message
+			}
+		}
+		return mergeAppErr
+	}
+	const operation apperror.Operation = "valid.prioritySearchErrorCode"
+	return apperror.CatchAllUnknownServerError(operation, err, "unknown error")
 }
 
 func toGRPCError(err error) error {
