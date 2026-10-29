@@ -32,14 +32,15 @@ type DetailedError interface {
 }
 
 type AppError struct {
-	Op                Operation
-	Code              ErrCode
-	Message           string
-	Fields            []FieldError
-	Err               error
-	replace           bool
-	merge             bool
-	priorityErrSearch bool
+	Op      Operation
+	Code    ErrCode
+	Message string
+	Fields  []FieldError
+	Err     error
+	replace bool
+	merge   bool
+	// priorityErrSearch bool
+	isClientErr bool
 }
 
 func (ap AppError) GiveErr() AppError {
@@ -64,18 +65,18 @@ func (apperr AppError) Merge() AppError {
 	return apperr
 }
 
-func (apperr AppError) SetPriorityErr() AppError {
-	apperr.priorityErrSearch = true
+func (apperr AppError) MakeAsClientErr() AppError {
+	apperr.isClientErr = true
 	return apperr
 }
 
-func (apperr AppError) RemovePriorityErr() AppError {
-	apperr.priorityErrSearch = false
+func (apperr AppError) RemoveFromClientErr() AppError {
+	apperr.isClientErr = false
 	return apperr
 }
 
-func (apperr AppError) GetPriorityErr() bool {
-	return apperr.priorityErrSearch
+func (apperr AppError) IsClientErr() bool {
+	return apperr.isClientErr
 }
 
 func (apperr AppError) UnMerge() AppError {

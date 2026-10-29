@@ -107,69 +107,90 @@ func convertToGRPCErr(err apperror.AppError) error {
 	return translationFn(err)
 }
 
-// priority is from left to right, left most has higher priority and right most and so on.
-var priorityClientDisplayErrCodes []apperror.ErrCode = []apperror.ErrCode{apperror.ClientCodeInvalidArgument, apperror.ClientCodeStorageConflict}
+// priority is from left to right, left most has higher priority than the right and so on.
+// var priorityClientDisplayErrCodes []apperror.ErrCode = []apperror.ErrCode{apperror.ClientCodeInvalidArgument, apperror.ClientCodeStorageConflict}
 
-func searchCode(code apperror.ErrCode, err error) (apperror.AppError, bool, bool) {
+type errorMessage struct {
+	Message string
+	Fields  []apperror.FieldError
+}
+
+func searchCode(err error, errCollection errorMessage) (errorMessage, apperror.DetailedError, bool) {
+	var errCollection1 errorMessage
+
+	// }
+	// if len(errCollection) > 0 {
+	// 	mergeAppErr := apperror.AppError{Code: errCollection[0].Code, Err: err, Message: errCollection[0].Message}
+	// 	for i, e := range errCollection {
+	// 		mergeAppErr.Fields = append(mergeAppErr.Fields, e.Fields...)
+	// 		if i > 0 {
+	// 			mergeAppErr.Message = mergeAppErr.Message + ";" + e.Message
+	// 		}
+	// 	}
+	// 	return mergeAppErr
+	// }
+
+	///////////////////////////////
+
 	detailedErr, ok := err.(apperror.DetailedError)
 	if ok {
-		if detailedErr.GiveErr().GetPriorityErr() {
-			if detailedErr.GiveErr().Code == code {
-				// todo make function
-				if !detailedErr.GiveErr().GetMergeStatus() {
-					return detailedErr.GiveErr(), false, true
-				}
-				return detailedErr.GiveErr(), true, true
+		if detailedErr.GiveErr().IsClientErr() {
+			if detailedErr.GiveErr().GetMergeStatus() {
+				errCollection1.Fields = append(errCollection.Fields, detailedErr.GiveErr().Fields...)
+				errCollection1.Message = errCollection.Message + detailedErr.GiveErr().Message
+
+				return searchCode(err, errCollection1)
+			} else {
+				return errorMessage{}, detailedErr.GiveErr(), ok
 			}
 		}
-		// todo make function
-		if !detailedErr.GiveErr().GetMergeStatus() {
-			return detailedErr.GiveErr(), false, true
-		}
-		return detailedErr.GiveErr(), true, true
 	}
 
 	switch t := err.(type) {
 	case interface{ Unwrap() error }:
-		return searchCode(code, t.Unwrap())
+		return searchCode(t.Unwrap(), errCollection)
 
 	case interface{ Unwrap() []error }:
-
 		for _, e := range t.Unwrap() {
-			if foundErr, mergeStatus, found := searchCode(code, e); found {
-				return foundErr, mergeStatus, found
+			errMessageUnwrap, detailedErrUnwrap, isOk := searchCode(e, errCollection)
+			if !isOk {
+				continue
 			}
+			errCollection1.Fields = append(errMessageUnwrap.Fields, detailedErrUnwrap.GiveErr().Fields...)
+			errCollection1.Message = errMessageUnwrap.Message + detailedErrUnwrap.GiveErr().Message
+			// errCollection1 = append(errCollection1, searchCode(e, errCollection)...)
 		}
 
 	}
 
-	return apperror.AppError{}, false, false
+	return errCollection1, detailedErr, ok
 }
 
 func prioritySearchErrorCode(err error) apperror.AppError {
-	var errCollection []apperror.AppError
-	for _, code := range priorityClientDisplayErrCodes {
-		appErr, mergeStatus, ok := searchCode(code, err)
-		if ok {
-			if !mergeStatus && len(errCollection) < 1 {
-				return appErr
-			}
-			errCollection = append(errCollection, appErr)
-		}
+	return apperror.AppError{}
+	// var errCollection []apperror.AppError
+	// for _, code := range priorityClientDisplayErrCodes {
+	// appErr, mergeStatus, ok := searchCode(err)
+	// if ok {
+	// 	if !mergeStatus && len(errCollection) < 1 {
+	// 		return appErr
+	// 	}
+	// 	errCollection = append(errCollection, appErr)
+	// }
 
-	}
-	if len(errCollection) > 0 {
-		mergeAppErr := apperror.AppError{Code: errCollection[0].Code, Err: err, Message: errCollection[0].Message}
-		for i, e := range errCollection {
-			mergeAppErr.Fields = append(mergeAppErr.Fields, e.Fields...)
-			if i > 0 {
-				mergeAppErr.Message = mergeAppErr.Message + ";" + e.Message
-			}
-		}
-		return mergeAppErr
-	}
-	const operation apperror.Operation = "valid.prioritySearchErrorCode"
-	return apperror.CatchAllUnknownServerError(operation, err, "unknown error")
+	// // }
+	// if len(errCollection) > 0 {
+	// 	mergeAppErr := apperror.AppError{Code: errCollection[0].Code, Err: err, Message: errCollection[0].Message}
+	// 	for i, e := range errCollection {
+	// 		mergeAppErr.Fields = append(mergeAppErr.Fields, e.Fields...)
+	// 		if i > 0 {
+	// 			mergeAppErr.Message = mergeAppErr.Message + ";" + e.Message
+	// 		}
+	// 	}
+	// 	return mergeAppErr
+	// }
+	// const operation apperror.Operation = "valid.prioritySearchErrorCode"
+	// return apperror.CatchAllUnknownServerError(operation, err, "unknown error")
 }
 
 func toGRPCError(err error) error {
