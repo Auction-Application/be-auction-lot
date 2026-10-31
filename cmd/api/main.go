@@ -15,6 +15,7 @@ import (
 	"google.golang.org/grpc"
 )
 
+// todo add logger
 func main() {
 	if err := godotenv.Load(); err != nil {
 		fmt.Println("No .env found, when using environment variables")

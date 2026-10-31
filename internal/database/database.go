@@ -42,6 +42,7 @@ type StorageField struct {
 // todo remove image_blobs table
 // todo lot_images is a separate verified true table.
 // todo tabel lots need a revamp
+// todo make error msg take parameter
 var databaseConstraint = foreignKeyViolationMessage{
 	"image_blob_upload_attempts_lot_id_fkey": []StorageField{
 		{
@@ -50,10 +51,25 @@ var databaseConstraint = foreignKeyViolationMessage{
 		},
 	},
 	// todo make uniq index verfied column, not upload_state column
+	// todo implement ALREADY_EXISTS grpc code
 	"idx_unq_img_attmpts_sha256_lot_id_upload_state": []StorageField{
 		{
 			Subject:     "Storage",
-			Description: "file with same sha256 and lotId whose upload has not been completed already exists",
+			Description: "file with same sha256 hash and lotId whose upload has not been completed already exists",
+		},
+	},
+	// todo remove this table, "image_blobs"
+	"lot_images_image_blob_id_fkey": []StorageField{
+		{
+			Subject:     "Storage",
+			Description: "image blob with given id does not exist",
+		},
+	},
+	// todo remove this table, "image_blobs"
+	"lot_images_lot_id_fkey": []StorageField{
+		{
+			Subject:     "Storage",
+			Description: "lot with given id does not exist",
 		},
 	},
 }
@@ -82,4 +98,8 @@ func DeriveIfStorageErrorMessage(err error) ([]StorageField, bool) {
 	}
 
 	return databaseConstraint.getErrorMessage(ForeignKeyName(pgError.ConstraintName))
+}
+
+func IsRowNotFound(err error) bool {
+	return errors.Is(err, pgx.ErrNoRows)
 }

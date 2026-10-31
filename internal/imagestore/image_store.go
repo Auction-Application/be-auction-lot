@@ -5,13 +5,12 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/Auction-Application/be-auction-item/internal/apperror"
 	"github.com/Auction-Application/be-auction-item/internal/database/filestore"
 	lotimage "github.com/Auction-Application/be-auction-item/rpc/gen/lot_image/v1"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/jackc/pgx/v5"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type ImageStore struct {
@@ -47,6 +46,7 @@ func convertToCompletedPart(wireFormatEtagParts []*lotimage.PartEtag) []types.Co
 }
 
 func (imageStore *ImageStore) GeneratePresignedUrl(ctx context.Context, presignRequest *lotimage.GeneratePresignedUrlRequest) (*lotimage.GeneratePresignedUrlResponse, error) {
+	const operation apperror.Operation = "imagestore.GeneratePresignedUrl"
 	uploadfileRequestResult, err := imageStore.initiateUpload(ctx, convertToUploadFiles(presignRequest.LotImages), *presignRequest.LotId)
 	if err != nil {
 		return nil, err
@@ -54,16 +54,16 @@ func (imageStore *ImageStore) GeneratePresignedUrl(ctx context.Context, presignR
 
 	dulicateImageFiles, err := convertToImageFiles(uploadfileRequestResult.duplicateFiles)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "error converting from duplicatedFiles")
+		return nil, err
 	}
 	alreadyUploadedImageFiles, err := convertToImageFiles(uploadfileRequestResult.alreadyUploadedFiles)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "error converting from alreadyUploadedFiles")
+		return nil, err
 	}
 
 	presignedImageFiles, err := convertToPresignedImageFiles(uploadfileRequestResult.presignedFileUrls)
 	if err != nil {
-		return nil, status.Error(codes.Internal, "error converting from alreadyUploadedFiles")
+		return nil, err
 	}
 
 	response := &lotimage.GeneratePresignedUrlResponse{
@@ -95,7 +95,6 @@ func convertToPresignedImageFiles(presignedUrls []presignedFileUrl) ([]*lotimage
 func convertToPresignedFile(presignedUrl presignedFileUrl) (*lotimage.PresignedFile, error) {
 	imageFile, err := convertToImageFile(presignedUrl.uploadFile)
 	if err != nil {
-		fmt.Println(err)
 		return nil, err
 	}
 	presignedUploadUrl := presignedUrl.presignedUploadUrl
@@ -212,7 +211,6 @@ func convertToImageFiles(files []uploadFile) ([]*lotimage.ImageFile, error) {
 	for _, file := range files {
 		iFile, err := convertToImageFile(file)
 		if err != nil {
-			fmt.Println("Error when converting to ImageFile")
 			return nil, err
 		}
 		imageFiles = append(imageFiles, iFile)
@@ -223,10 +221,10 @@ func convertToImageFiles(files []uploadFile) ([]*lotimage.ImageFile, error) {
 }
 
 func convertToImageFile(file uploadFile) (*lotimage.ImageFile, error) {
+	const operation apperror.Operation = "imagestore.convertToImageFile"
 	clientId, err := strconv.Atoi(file.ClientFileId)
 	if err != nil {
-		fmt.Println(err)
-		return nil, err
+		return nil, apperror.InternalServerError(operation, fmt.Errorf("cannot convert client file id %s to integer:%w", file.ClientFileId, err), "internal error").MakeAsClientErr()
 	}
 	imageFile := &lotimage.ImageFile{
 		Sha256:       new(file.Sha256),

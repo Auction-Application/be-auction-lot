@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/hex"
-	"errors"
 	"fmt"
-	"log"
 	"slices"
 	"time"
 
@@ -19,9 +17,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 const (
@@ -116,18 +111,7 @@ func (s3Storage s3Storage) generateS3UploadUrl(ctx context.Context, files []uplo
 		multipartPresignedFileUrls, err := s3Storage.createMultipartPresignedFileUrl(ctx,
 			lotId, query, extractData.multipartFile)
 		if err != nil {
-			return nil, apperror.InvalidArgumentError("test", apperror.ErrDetails{
-				Fields: []apperror.FieldError{
-					{
-						Field:       "test",
-						Description: "err",
-					},
-				},
-				Message: "testing xa",
-			},
-				// err).MakeAsClientErr()
-				// err).MakeClientErrAndMerge()
-				err)
+			return nil, err
 		}
 
 		fileUploads = append(fileUploads, multipartPresignedFileUrls...)
@@ -158,15 +142,12 @@ func (s3Storage s3Storage) createMultipartPresignedFileUrl(ctx context.Context,
 	if err != nil {
 		errFields, ok := database.DeriveIfStorageErrorMessage(err)
 		if !ok {
-			return nil, err
+			return nil, apperror.InternalServerError(operation, fmt.Errorf("insert and validation of multipart upload failed,%w", err), "internal error").MakeAsClientErr()
 		}
-		abcd := apperror.PreconditionFailedError(operation, apperror.ErrDetails{
+		return nil, apperror.PreconditionFailedError(operation, apperror.ErrDetails{
 			Fields:  convertToFieldErr(errFields),
 			Message: "unknown lotId",
-			// }, err)
 		}, err).MakeAsClientErr()
-		// }, err).MakeClientErrAndMerge()
-		return nil, &abcd
 	}
 
 	newMultiUploads, resumableMultiUploads := segregateMultiUploadFiles(multiUploadResult)
@@ -189,6 +170,7 @@ func (s3Storage s3Storage) createMultipartPresignedFileUrl(ctx context.Context,
 func (s3Storage s3Storage) createSinglePresignedFileUrl(ctx context.Context,
 	lotId uuid.UUID, query *filestore.Queries, singleFileData singleFileData,
 ) ([]presignedFileUrl, error) {
+	const operation apperror.Operation = "fileupload.createSinglePresignedFileUrl"
 	singlePresignedFileUrls := make([]presignedFileUrl, 0, len(singleFileData.singleFileUploads))
 	insertedSinglePartFiles, err := query.InsertSinglePartUpload(ctx,
 		filestore.InsertSinglePartUploadParams{
@@ -200,23 +182,26 @@ func (s3Storage s3Storage) createSinglePresignedFileUrl(ctx context.Context,
 			ContentTypes: singleFileData.singlePartFileContentTypes,
 			FilesNames:   singleFileData.singlePartFileNames,
 		})
-
+	if err != nil {
+		errFields, ok := database.DeriveIfStorageErrorMessage(err)
+		if !ok {
+			return nil, apperror.InternalServerError(operation, fmt.Errorf("insertion of singlepart upload failed,%w", err), "internal error").MakeAsClientErr()
+		}
+		return nil, apperror.PreconditionFailedError(operation, apperror.ErrDetails{
+			Fields:  convertToFieldErr(errFields),
+			Message: "storage error",
+		}, err).MakeAsClientErr()
+	}
 	insertedSinglePartFilesMap := make(map[string]uuid.UUID)
 
 	for _, insertedSingleFile := range insertedSinglePartFiles {
 		insertedSinglePartFilesMap[insertedSingleFile.Sha256] = insertedSingleFile.StorageKey
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
 	for _, singleUploadFile := range singleFileData.singleFileUploads {
 		notMultipartFileUpload, err := s3Storage.generateSinglePresignedPutObjectUrl(ctx,
 			insertedSinglePartFilesMap[singleUploadFile.Sha256].String(), singleUploadFile.Sha256)
 		if err != nil {
-			fmt.Println("Error")
-			fmt.Println(err)
 			return nil, err
 		}
 		singlePresignedFileUrls = append(singlePresignedFileUrls, presignedFileUrl{
@@ -252,6 +237,7 @@ type extractFile struct {
 }
 
 func (s3Storage s3Storage) extractFileData(ctx context.Context, files []uploadFile) (extractFile, error) {
+	const operation apperror.Operation = "fileupload.extractFileData"
 	singleFileUploads := make([]singleUploadFile, 0)
 
 	singleFileSha256s := make([]string, 0)
@@ -283,7 +269,7 @@ func (s3Storage s3Storage) extractFileData(ctx context.Context, files []uploadFi
 			multipartFileSizes = append(multipartFileSizes, int32(file.FileSize))
 			generatedUUID, err := makeUUIDText()
 			if err != nil {
-				return extractFile{}, err
+				return extractFile{}, apperror.InternalServerError(operation, fmt.Errorf("Cannot generate uuid:%w", err), "internal error").MakeAsClientErr()
 			}
 			multipartFileStorageKeys = append(multipartFileStorageKeys, uuid.MustParse(generatedUUID))
 			uploadId, err := s3Storage.generateMultiPartUploadId(ctx, generatedUUID)
@@ -413,9 +399,11 @@ func (s3Storage s3Storage) generateSinglePresignedPutObjectUrl(
 ) (singlePresignedUrl,
 	error,
 ) {
+	const operation apperror.Operation = "fileupload.generateSinglePresignedPutObjectUrl"
 	base64EncodedSha256, err := hexToBase64(sha256)
 	if err != nil {
-		return singlePresignedUrl{}, err
+		return singlePresignedUrl{}, apperror.InternalServerError(operation, fmt.Errorf(
+			"conversion of hex to base64 version of sha256(%s) failed:%w", sha256, err), "internal error").MakeAsClientErr()
 	}
 	presignResult, err := s3Storage.Presigner.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket:            aws.String(s3Storage.bucketName),
@@ -428,9 +416,8 @@ func (s3Storage s3Storage) generateSinglePresignedPutObjectUrl(
 		})
 	})
 	if err != nil {
-		log.Printf("Couldn't get a presigned request to put %v:%v. Here's why: %v\n",
-			s3Storage.bucketName, objectKey, err)
-		return singlePresignedUrl{}, err
+		return singlePresignedUrl{}, apperror.InternalServerError(operation,
+			fmt.Errorf("PresignPutObject failed, key is %s,base64 encoded sha256 is %s;%w", objectKey, base64EncodedSha256, err), "internal error").MakeAsClientErr()
 	}
 	return singlePresignedUrl{request: presignResult}, err
 }
@@ -444,10 +431,10 @@ func hexToBase64(hexString string) (string, error) {
 }
 
 func (s3Storage s3Storage) generateMultiPartUploadId(ctx context.Context, objectKey string) (string, error) {
+	const operation apperror.Operation = "fileupload.generateMultiPartUploadId"
 	multipartCreated, err := s3Storage.s3Client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{Bucket: &s3Storage.bucketName, Key: &objectKey})
 	if err != nil {
-		fmt.Println(err)
-		return "", fmt.Errorf("create multipart upload error:%w", err)
+		return "", apperror.InternalServerError(operation, fmt.Errorf("creation of multipart upload failed:%w", err), "internal error").MakeAsClientErr()
 	}
 
 	return *multipartCreated.UploadId, nil
@@ -455,6 +442,7 @@ func (s3Storage s3Storage) generateMultiPartUploadId(ctx context.Context, object
 
 func (s3Storage s3Storage) generateNewMultiPartUploadUrls(ctx context.Context, uploadIdentity uploadIdentity, fileParts []int16,
 ) ([]multiPresignedRequest, error) {
+	const operation apperror.Operation = "fileupload.generateNewMultiPartUploadUrls"
 	multiparts := make([]multiPresignedRequest, 0, len(fileParts))
 
 	for _, partNumber := range fileParts {
@@ -464,8 +452,7 @@ func (s3Storage s3Storage) generateNewMultiPartUploadUrls(ctx context.Context, u
 			Key:    &uploadIdentity.storageKey, PartNumber: aws.Int32(int32(partNumber)), UploadId: &uploadIdentity.uploadId,
 		}, s3.WithPresignExpires(presignExpiry))
 		if err != nil {
-			fmt.Println(err)
-			return nil, fmt.Errorf("creating mulipart upload url failed: %w", err)
+			return nil, apperror.InternalServerError(operation, fmt.Errorf("creating mulipart upload url failed: %w", err), "generation of multipart upload url failed").MakeAsClientErr()
 		}
 
 		multiparts = append(multiparts, multiPresignedRequest{request: presignedUploadPartUrl, part: partNumber})
@@ -478,15 +465,15 @@ func (s3Storage s3Storage) generateNewMultiPartUploadUrls(ctx context.Context, u
 func (s3Storage s3Storage) generateResumeUploadUrls(ctx context.Context, uploadIdentity uploadIdentity,
 	allParts []int16,
 ) ([]multiPresignedRequest, []imageEtag, error) {
+	const operation apperror.Operation = "fileupload.generateResumeUploadUrls"
 	nonUploadedParts, uploadedEtags, err := s3Storage.listNotUploadedParts(ctx, uploadIdentity, allParts)
 	if err != nil {
-		fmt.Println(err)
-		return nil, nil, err
+		return nil, nil, apperror.InternalServerError(operation,
+			fmt.Errorf("listing of non-uploaded parts failed:%w,err"), "internal error").MakeAsClientErr()
 	}
 
 	resumeMultiParts, err := s3Storage.generateExistingMultiPartPresignedUrl(ctx, uploadIdentity, nonUploadedParts)
 	if err != nil {
-		fmt.Println(err)
 		return nil, nil, err
 	}
 
@@ -496,6 +483,7 @@ func (s3Storage s3Storage) generateResumeUploadUrls(ctx context.Context, uploadI
 func (s3Storage s3Storage) generateExistingMultiPartPresignedUrl(ctx context.Context, uploadIdentity uploadIdentity,
 	nonUploadedParts []int16,
 ) ([]multiPresignedRequest, error) {
+	const operation apperror.Operation = "fileupload.generateExistingMultiPartPresignedUrl"
 	multiparts := make([]multiPresignedRequest, 0, len(nonUploadedParts))
 
 	for _, part := range nonUploadedParts {
@@ -505,8 +493,8 @@ func (s3Storage s3Storage) generateExistingMultiPartPresignedUrl(ctx context.Con
 			Key: &uploadIdentity.storageKey, PartNumber: aws.Int32(int32(part)), UploadId: &uploadIdentity.uploadId,
 		}, s3.WithPresignExpires(presignExpiry))
 		if err != nil {
-			fmt.Println(err)
-			return nil, err
+			return nil, apperror.InternalServerError(operation,
+				fmt.Errorf("cannot create presigned url for resumable multipart upload:%w", err), "internal error").MakeAsClientErr()
 		}
 
 		multiparts = append(multiparts, multiPresignedRequest{request: presignedUploadPartUrl, part: part})
@@ -516,13 +504,14 @@ func (s3Storage s3Storage) generateExistingMultiPartPresignedUrl(ctx context.Con
 }
 
 func (s3Storage s3Storage) listNotUploadedParts(ctx context.Context, uploadIdentity uploadIdentity, allParts []int16) ([]int16, []imageEtag, error) {
+	const operation apperror.Operation = "fileupload.listNotUploadedParts"
 	partOutput, err := s3Storage.s3Client.ListParts(ctx, &s3.ListPartsInput{
 		Bucket:   &s3Storage.bucketName,
 		Key:      &uploadIdentity.storageKey,
 		UploadId: &uploadIdentity.uploadId,
 	})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, apperror.InternalServerError(operation, fmt.Errorf("s3Client list parts api failed:%w", err), "cannot find uploaded parts")
 	}
 
 	alreadyUploadedParts := partOutput.Parts
@@ -572,11 +561,19 @@ func intentBatchUpload(fileToUpload []uploadFile) ([]uploadFile, []duplicateFile
 	return files, duplicateFiles
 }
 
-func (imageStore *ImageStore) completeMultiPartUpload(ctx context.Context, multipartAttemptId int64, bucketName string, etagParts []types.CompletedPart) error {
+func (imageStore *ImageStore) completeMultiPartUpload(ctx context.Context, multipartAttemptId int64,
+	bucketName string, etagParts []types.CompletedPart,
+) error {
+	const operation apperror.Operation = "imagestore.completeMultiPartUpload"
 	multipartItem, err := imageStore.dbStorageQuery.GetMultiPartUploadItem(ctx, multipartAttemptId)
 	if err != nil {
-		fmt.Println(err)
-		return err
+		if database.IsRowNotFound(err) {
+			return apperror.NotFoundError(operation, fmt.Errorf("multipart attempt id %d not found:%w", multipartAttemptId, err),
+				fmt.Sprintf("multipart attempt Id %d could not be found", multipartAttemptId)).MakeAsClientErr()
+		}
+		return apperror.InternalServerError(operation,
+			fmt.Errorf("cannot get multipart attempt id %d:%w", multipartAttemptId, err),
+			"internal error").MakeAsClientErr()
 	}
 
 	slices.SortFunc(etagParts, func(a, b types.CompletedPart) int {
@@ -589,16 +586,21 @@ func (imageStore *ImageStore) completeMultiPartUpload(ctx context.Context, multi
 		UploadId: multipartItem.UploadID,
 	})
 	if err != nil {
-		fmt.Println(err)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return status.Error(codes.NotFound, "upload attempt not found")
-		}
-		return err
+		return apperror.InternalServerError(operation,
+			fmt.Errorf("Cannot get uploaded image parts of key %s and bucket %s:%w",
+				multipartItem.StorageKey.String(), bucketName, err), "internal error").MakeAsClientErr()
 	}
 
 	if len(partOutput.Parts) != int(*multipartItem.PartCount) {
-		fmt.Println("All the parts have not been uploaded")
-		return errors.New("all parts have not been uploaded")
+		return apperror.PreconditionFailedError(operation, apperror.ErrDetails{Fields: []apperror.FieldError{{
+			Field: "parts",
+			Description: fmt.Sprintf(
+				"All parts have not been uploaded for multipart Attempt Id %d. First Upload all the parts.",
+				multipartAttemptId,
+			),
+		}}}, fmt.Errorf(
+			"all parts have not been uploaded for multipart attempt id %d;%w", multipartAttemptId, err
+			)).MakeAsClientErr()
 	}
 
 	_, err = imageStore.s3Storage.s3Client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
@@ -610,7 +612,7 @@ func (imageStore *ImageStore) completeMultiPartUpload(ctx context.Context, multi
 		},
 	})
 	if err != nil {
-		return err
+		apperror.InternalServerError(operation,fmt.Errorf("cannot complete multipart upload;%w",err)).MakeAsClientErr()
 	}
 
 	return nil
@@ -627,13 +629,6 @@ func (imageStore *ImageStore) initiateUpload(ctx context.Context, fileToUpload [
 	files, duplicateFiles := intentBatchUpload(fileToUpload)
 	lotIdUUID, err := uuid.Parse(lotId)
 	if err != nil {
-		// return uploadFileRequestResult{}, fmt.Errorf("the error is %w and custom error is %w", err, apperror.InvalidArgumentError(operation, []apperror.FieldError{
-		// 	{
-		// 		Field:       "lotId",
-		// 		Description: "lotId could not be parsed as uuid",
-		// 	},
-		// },
-		// 	err))
 		return uploadFileRequestResult{}, apperror.InvalidArgumentError(operation, apperror.ErrDetails{
 			Fields: []apperror.FieldError{
 				{
@@ -643,28 +638,25 @@ func (imageStore *ImageStore) initiateUpload(ctx context.Context, fileToUpload [
 			},
 			Message: "unknown lotId",
 		},
-			err)
+			err).MakeAsClientErr()
 	}
-	fmt.Println(duplicateFiles)
 	tx, err := imageStore.conn.Begin(ctx)
 	if err != nil {
-		return uploadFileRequestResult{}, apperror.InternalServerError(operation, err, "start of db transaction failed")
+		return uploadFileRequestResult{}, apperror.InternalServerError(operation, fmt.Errorf("start of db transaction failed:%w", err), "cannot start operation").MakeAsClientErr()
 	}
 	defer tx.Rollback(ctx)
 	qtx := imageStore.dbStorageQuery.WithTx(tx)
 	needToBeUploadFiles, alreadyUploadedFiles, err := skipUploadForIdenticalImageBlobs(ctx, files, lotIdUUID, qtx)
 	if err != nil {
-		fmt.Println(err)
 		return uploadFileRequestResult{}, err
 	}
 	presignedUrls, err := imageStore.s3Storage.generateS3UploadUrl(ctx, needToBeUploadFiles, lotIdUUID, qtx)
 	if err != nil {
-		fmt.Println(err)
 		return uploadFileRequestResult{}, err
 	}
 	err = tx.Commit(ctx)
 	if err != nil {
-		return uploadFileRequestResult{}, err
+		return uploadFileRequestResult{}, apperror.InternalServerError(operation, fmt.Errorf("cannot commit database transaction:%w", err), "internal error").MakeAsClientErr()
 	}
 	return uploadFileRequestResult{
 		duplicateFiles:       duplicateFiles,
@@ -676,6 +668,7 @@ func (imageStore *ImageStore) initiateUpload(ctx context.Context, fileToUpload [
 type alreadyUploadedFile = uploadFile
 
 func skipUploadForIdenticalImageBlobs(ctx context.Context, files []uploadFile, lotId uuid.UUID, query *filestore.Queries) ([]uploadFile, []alreadyUploadedFile, error) {
+	const operation apperror.Operation = "imagestore.skipUploadForIdenticalImageBlobs"
 	sha256s := make([]string, 0, len(files))
 	fileNames := make([]string, 0, len(files))
 
@@ -692,7 +685,18 @@ func skipUploadForIdenticalImageBlobs(ctx context.Context, files []uploadFile, l
 		FileNames: fileNames,
 	})
 	if err != nil {
-		return nil, nil, err
+		errFields, ok := database.DeriveIfStorageErrorMessage(err)
+		if !ok {
+			return nil, nil, apperror.InternalServerError(
+				operation,
+				fmt.Errorf("insert identical image blob to log_images table failed:%w", err), "internal error",
+			).MakeAsClientErr()
+		}
+
+		return nil, nil, apperror.PreconditionFailedError(operation, apperror.ErrDetails{
+			Fields:  convertToFieldErr(errFields),
+			Message: "internal error",
+		}, err).MakeAsClientErr()
 	}
 
 	existingFileMap := make(map[string]filestore.InsertIdenticalImageBlobsToLotImagesRow, len(identicalBlobs))
@@ -721,9 +725,10 @@ func separateUploadedAndNeedToBeUploadedFiles(fileMap map[string]uploadFile, exi
 }
 
 func makeUUIDText() (string, error) {
+	const operation apperror.Operation = "fileupload.makeUUIDText"
 	uuid, err := uuid.NewRandom()
 	if err != nil {
-		return "", err
+		return "", apperror.InternalServerError(operation, fmt.Errorf("Cannot generate uuid:%w", err), "internal error")
 	}
 
 	uuidText := uuid.String()

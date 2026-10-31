@@ -89,11 +89,16 @@ func codeUnknownErrTranslation(err apperror.AppError) error {
 	return status.Error(codes.Unknown, err.Message)
 }
 
+func codeNotFoundTranslation(err apperror.AppError) error {
+	return status.Error(codes.NotFound, err.Message)
+}
+
 var appErrToGRPCTranslation = map[apperror.ErrCode]func(err apperror.AppError) error{
 	apperror.CodeInvalidArgument:     codeInvalidArgumentTranslation,
 	apperror.CodeStorageConflict:     codeStorageConflictTranslation,
 	apperror.CodeInternalServerError: codeInternalServerErrorTranslation,
 	apperror.CodeUnknownError:        codeUnknownErrTranslation,
+	apperror.CodeNotFound:            codeNotFoundTranslation,
 }
 
 func convertToGRPCErr(err apperror.AppError) error {

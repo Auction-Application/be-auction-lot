@@ -13,6 +13,7 @@ const (
 	CodeStorageConflict
 	CodeInternalServerError
 	CodeUnknownError
+	CodeNotFound
 )
 
 type Operation string
@@ -112,6 +113,15 @@ func PreconditionFailedError(op Operation, errDetails ErrDetails, err error) App
 		Message: errDetails.Message,
 		Fields:  errDetails.Fields,
 		Err:     fmt.Errorf("failed preconditions are: %s, error is: %w", strings.Join(errorSlice, "\n"), err),
+	}
+}
+
+func NotFoundError(op Operation, err error, msg string) AppError {
+	return AppError{
+		Op:      op,
+		Code:    CodeNotFound,
+		Message: msg,
+		Err:     err,
 	}
 }
 
