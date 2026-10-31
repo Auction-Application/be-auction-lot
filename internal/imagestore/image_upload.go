@@ -269,7 +269,7 @@ func (s3Storage s3Storage) extractFileData(ctx context.Context, files []uploadFi
 			multipartFileSizes = append(multipartFileSizes, int32(file.FileSize))
 			generatedUUID, err := makeUUIDText()
 			if err != nil {
-				return extractFile{}, apperror.InternalServerError(operation, fmt.Errorf("Cannot generate uuid:%w", err), "internal error").MarkAsClientErr()
+				return extractFile{}, apperror.InternalServerError(operation, fmt.Errorf("cannot generate uuid:%w", err), "internal error").MarkAsClientErr()
 			}
 			multipartFileStorageKeys = append(multipartFileStorageKeys, uuid.MustParse(generatedUUID))
 			uploadId, err := s3Storage.generateMultiPartUploadId(ctx, generatedUUID)
@@ -469,7 +469,7 @@ func (s3Storage s3Storage) generateResumeUploadUrls(ctx context.Context, uploadI
 	nonUploadedParts, uploadedEtags, err := s3Storage.listNotUploadedParts(ctx, uploadIdentity, allParts)
 	if err != nil {
 		return nil, nil, apperror.InternalServerError(operation,
-			fmt.Errorf("listing of non-uploaded parts failed:%w,err"), "internal error").MarkAsClientErr()
+			fmt.Errorf("listing of non-uploaded parts failed:%w", err), "internal error").MarkAsClientErr()
 	}
 
 	resumeMultiParts, err := s3Storage.generateExistingMultiPartPresignedUrl(ctx, uploadIdentity, nonUploadedParts)
@@ -587,7 +587,7 @@ func (imageStore *ImageStore) completeMultiPartUpload(ctx context.Context, multi
 	})
 	if err != nil {
 		return apperror.InternalServerError(operation,
-			fmt.Errorf("Cannot get uploaded image parts of key %s and bucket %s:%w",
+			fmt.Errorf("cannot get uploaded image parts of key %s and bucket %s:%w",
 				multipartItem.StorageKey.String(), bucketName, err), "internal error").MarkAsClientErr()
 	}
 
@@ -733,7 +733,7 @@ func makeUUIDText() (string, error) {
 	const operation apperror.Operation = "fileupload.makeUUIDText"
 	uuid, err := uuid.NewRandom()
 	if err != nil {
-		return "", apperror.InternalServerError(operation, fmt.Errorf("Cannot generate uuid:%w", err), "internal error")
+		return "", apperror.InternalServerError(operation, fmt.Errorf("cannot generate uuid:%w", err), "internal error")
 	}
 
 	uuidText := uuid.String()
