@@ -54,11 +54,12 @@ func (apperr AppError) Unwrap() error {
 	return apperr.Err
 }
 
-func (apperr AppError) MakeAsClientErr() AppError {
+func (apperr AppError) MarkAsClientErr() AppError {
 	apperr.isClientErr = true
 	return apperr
 }
 
+// todo maybe unnecessary
 func (apperr AppError) RemoveFromClientErr() AppError {
 	apperr.isClientErr = false
 	return apperr
@@ -68,12 +69,13 @@ func (apperr AppError) IsClientErr() bool {
 	return apperr.isClientErr
 }
 
-func (apperr AppError) MakeClientErrAndMerge() AppError {
+func (apperr AppError) MarkAsClientErrAndMerge() AppError {
 	apperr.isClientErr = true
 	apperr.merge = true
 	return apperr
 }
 
+// todo maybe unnecessary
 func (apperr AppError) UnMerge() AppError {
 	apperr.merge = false
 	return apperr

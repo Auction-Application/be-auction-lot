@@ -224,7 +224,7 @@ func convertToImageFile(file uploadFile) (*lotimage.ImageFile, error) {
 	const operation apperror.Operation = "imagestore.convertToImageFile"
 	clientId, err := strconv.Atoi(file.ClientFileId)
 	if err != nil {
-		return nil, apperror.InternalServerError(operation, fmt.Errorf("cannot convert client file id %s to integer:%w", file.ClientFileId, err), "internal error").MakeAsClientErr()
+		return nil, apperror.InternalServerError(operation, fmt.Errorf("cannot convert client file id %s to integer:%w", file.ClientFileId, err), "internal error").MarkAsClientErr()
 	}
 	imageFile := &lotimage.ImageFile{
 		Sha256:       new(file.Sha256),
