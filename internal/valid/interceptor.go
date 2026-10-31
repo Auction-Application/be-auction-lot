@@ -47,7 +47,7 @@ func Validate(v protovalidate.Validator) grpc.UnaryServerInterceptor {
 	}
 }
 
-func clientCodeInvalidArgumentTranslation(err apperror.AppError) error {
+func codeInvalidArgumentTranslation(err apperror.AppError) error {
 	br := &errdetails.BadRequest{}
 	for _, viol := range err.Fields {
 		br.FieldViolations = append(br.FieldViolations, &errdetails.BadRequest_FieldViolation{
@@ -64,7 +64,7 @@ func clientCodeInvalidArgumentTranslation(err apperror.AppError) error {
 	return st.Err()
 }
 
-func clientCodeStorageConflictTranslation(err apperror.AppError) error {
+func codeStorageConflictTranslation(err apperror.AppError) error {
 	preCond := &errdetails.PreconditionFailure{}
 	for _, viol := range err.Fields {
 		preCond.Violations = append(preCond.Violations, &errdetails.PreconditionFailure_Violation{
@@ -90,10 +90,10 @@ func codeUnknownErrTranslation(err apperror.AppError) error {
 }
 
 var appErrToGRPCTranslation = map[apperror.ErrCode]func(err apperror.AppError) error{
-	apperror.ClientCodeInvalidArgument: clientCodeInvalidArgumentTranslation,
-	apperror.ClientCodeStorageConflict: clientCodeStorageConflictTranslation,
-	apperror.CodeInternalServerError:   codeInternalServerErrorTranslation,
-	apperror.CodeUnknownError:          codeUnknownErrTranslation,
+	apperror.CodeInvalidArgument:     codeInvalidArgumentTranslation,
+	apperror.CodeStorageConflict:     codeStorageConflictTranslation,
+	apperror.CodeInternalServerError: codeInternalServerErrorTranslation,
+	apperror.CodeUnknownError:        codeUnknownErrTranslation,
 }
 
 func convertToGRPCErr(err apperror.AppError) error {

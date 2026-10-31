@@ -126,7 +126,8 @@ func (s3Storage s3Storage) generateS3UploadUrl(ctx context.Context, files []uplo
 				Message: "testing xa",
 			},
 				// err).MakeAsClientErr()
-				err).MakeClientErrAndMerge()
+				// err).MakeClientErrAndMerge()
+				err)
 		}
 
 		fileUploads = append(fileUploads, multipartPresignedFileUrls...)
@@ -162,6 +163,7 @@ func (s3Storage s3Storage) createMultipartPresignedFileUrl(ctx context.Context,
 		abcd := apperror.PreconditionFailedError(operation, apperror.ErrDetails{
 			Fields:  convertToFieldErr(errFields),
 			Message: "unknown lotId",
+			// }, err)
 		}, err).MakeAsClientErr()
 		// }, err).MakeClientErrAndMerge()
 		return nil, &abcd

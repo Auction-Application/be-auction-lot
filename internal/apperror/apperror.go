@@ -9,8 +9,8 @@ type ErrCode int
 
 const (
 	_ ErrCode = iota
-	ClientCodeInvalidArgument
-	ClientCodeStorageConflict
+	CodeInvalidArgument
+	CodeStorageConflict
 	CodeInternalServerError
 	CodeUnknownError
 )
@@ -94,7 +94,7 @@ func InvalidArgumentError(op Operation, errDetails ErrDetails, err error) AppErr
 	}
 	return AppError{
 		Op:      op,
-		Code:    ClientCodeInvalidArgument,
+		Code:    CodeInvalidArgument,
 		Fields:  errDetails.Fields,
 		Err:     fmt.Errorf("invalid arguments are: %s, error is: %w", strings.Join(errorSlice, "\n"), err),
 		Message: errDetails.Message,
@@ -108,7 +108,7 @@ func PreconditionFailedError(op Operation, errDetails ErrDetails, err error) App
 	}
 	return AppError{
 		Op:      op,
-		Code:    ClientCodeStorageConflict,
+		Code:    CodeStorageConflict,
 		Message: errDetails.Message,
 		Fields:  errDetails.Fields,
 		Err:     fmt.Errorf("failed preconditions are: %s, error is: %w", strings.Join(errorSlice, "\n"), err),
