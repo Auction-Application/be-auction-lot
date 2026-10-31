@@ -73,7 +73,6 @@ func clientCodeStorageConflictTranslation(err apperror.AppError) error {
 		})
 	}
 
-	// todo make message dynamic
 	st, detailsErr := status.New(codes.FailedPrecondition, err.Message).WithDetails(preCond)
 	if detailsErr != nil {
 		return status.Error(codes.Internal, "precondition failed and internal error")
@@ -83,11 +82,11 @@ func clientCodeStorageConflictTranslation(err apperror.AppError) error {
 }
 
 func codeInternalServerErrorTranslation(err apperror.AppError) error {
-	return status.Error(codes.Internal, "internal server error")
+	return status.Error(codes.Internal, err.Message)
 }
 
 func codeUnknownErrTranslation(err apperror.AppError) error {
-	return status.Error(codes.Unknown, "unknown error")
+	return status.Error(codes.Unknown, err.Message)
 }
 
 var appErrToGRPCTranslation = map[apperror.ErrCode]func(err apperror.AppError) error{
@@ -107,90 +106,13 @@ func convertToGRPCErr(err apperror.AppError) error {
 	return translationFn(err)
 }
 
-// priority is from left to right, left most has higher priority than the right and so on.
-// var priorityClientDisplayErrCodes []apperror.ErrCode = []apperror.ErrCode{apperror.ClientCodeInvalidArgument, apperror.ClientCodeStorageConflict}
-
-type errorMessage struct {
-	Message string
-	Fields  []apperror.FieldError
-}
-
-func searchCode(err error, errCollection errorMessage) (errorMessage, apperror.DetailedError, bool) {
-	var errCollection1 errorMessage
-
-	// }
-	// if len(errCollection) > 0 {
-	// 	mergeAppErr := apperror.AppError{Code: errCollection[0].Code, Err: err, Message: errCollection[0].Message}
-	// 	for i, e := range errCollection {
-	// 		mergeAppErr.Fields = append(mergeAppErr.Fields, e.Fields...)
-	// 		if i > 0 {
-	// 			mergeAppErr.Message = mergeAppErr.Message + ";" + e.Message
-	// 		}
-	// 	}
-	// 	return mergeAppErr
-	// }
-
-	///////////////////////////////
-
-	detailedErr, ok := err.(apperror.DetailedError)
-	if ok {
-		if detailedErr.GiveErr().IsClientErr() {
-			if detailedErr.GiveErr().GetMergeStatus() {
-				errCollection1.Fields = append(errCollection.Fields, detailedErr.GiveErr().Fields...)
-				errCollection1.Message = errCollection.Message + detailedErr.GiveErr().Message
-
-				return searchCode(err, errCollection1)
-			} else {
-				return errorMessage{}, detailedErr.GiveErr(), ok
-			}
-		}
+func createErr(err error) apperror.AppError {
+	const operation apperror.Operation = "valid.prioritySearchErrorCode"
+	resultErr, ok := apperror.CreateClientErr(err)
+	if !ok {
+		return apperror.CatchAllUnknownServerError(operation, err, "unknown error")
 	}
-
-	switch t := err.(type) {
-	case interface{ Unwrap() error }:
-		return searchCode(t.Unwrap(), errCollection)
-
-	case interface{ Unwrap() []error }:
-		for _, e := range t.Unwrap() {
-			errMessageUnwrap, detailedErrUnwrap, isOk := searchCode(e, errCollection)
-			if !isOk {
-				continue
-			}
-			errCollection1.Fields = append(errMessageUnwrap.Fields, detailedErrUnwrap.GiveErr().Fields...)
-			errCollection1.Message = errMessageUnwrap.Message + detailedErrUnwrap.GiveErr().Message
-			// errCollection1 = append(errCollection1, searchCode(e, errCollection)...)
-		}
-
-	}
-
-	return errCollection1, detailedErr, ok
-}
-
-func prioritySearchErrorCode(err error) apperror.AppError {
-	return apperror.AppError{}
-	// var errCollection []apperror.AppError
-	// for _, code := range priorityClientDisplayErrCodes {
-	// appErr, mergeStatus, ok := searchCode(err)
-	// if ok {
-	// 	if !mergeStatus && len(errCollection) < 1 {
-	// 		return appErr
-	// 	}
-	// 	errCollection = append(errCollection, appErr)
-	// }
-
-	// // }
-	// if len(errCollection) > 0 {
-	// 	mergeAppErr := apperror.AppError{Code: errCollection[0].Code, Err: err, Message: errCollection[0].Message}
-	// 	for i, e := range errCollection {
-	// 		mergeAppErr.Fields = append(mergeAppErr.Fields, e.Fields...)
-	// 		if i > 0 {
-	// 			mergeAppErr.Message = mergeAppErr.Message + ";" + e.Message
-	// 		}
-	// 	}
-	// 	return mergeAppErr
-	// }
-	// const operation apperror.Operation = "valid.prioritySearchErrorCode"
-	// return apperror.CatchAllUnknownServerError(operation, err, "unknown error")
+	return resultErr
 }
 
 func toGRPCError(err error) error {
@@ -209,7 +131,8 @@ func toGRPCError(err error) error {
 		return status.Error(codes.Canceled, "request cancelled")
 	}
 
-	appError := prioritySearchErrorCode(err)
+	// todo refactor
+	appError := createErr(err)
 	// todo add logging
 	fmt.Println(appError)
 	return convertToGRPCErr(appError)
